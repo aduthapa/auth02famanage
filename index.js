@@ -62,7 +62,7 @@ app.get('/profile', requiresAuth(), async (req, res) => {
     const user = await managementAPI.getUser({ id: userId });
 
     // Get user's MFA enrollments
-    const enrollments = await managementAPI.getUserEnrollments({ id: userId });
+    const enrollments = await managementAPI.getGuardianEnrollments({ id: userId });
 
     res.render('profile', { 
       user: req.oidc.user, 
