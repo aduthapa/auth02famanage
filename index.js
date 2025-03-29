@@ -88,12 +88,12 @@ app.post('/enroll-mfa', requiresAuth(), async (req, res) => {
 
   try {
     // Create a ticket for MFA enrollment
-    const ticket = await managementAPI.createTicket({
-      user_id: userId,
-      result_url: `${config.baseURL}/profile`,
-      ttl_sec: 3600,
-      includeEmailInRedirect: true
-    });
+    const ticket = await managementAPI.tickets.create({
+  user_id: userId,
+  result_url: `${config.baseURL}/profile`,
+  ttl_sec: 3600,
+  includeEmailInRedirect: true
+});
 
     // Redirect to Auth0 MFA enrollment page with the specific method
     res.redirect(`https://${process.env.AUTH0_DOMAIN}/mfa/associate?ticket=${ticket.ticket}&enrollment_type=${method}`);
