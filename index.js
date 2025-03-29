@@ -45,7 +45,7 @@ const managementAPI = new ManagementClient({
   domain: process.env.AUTH0_DOMAIN,
   clientId: process.env.AUTH0_MGMT_CLIENT_ID,
   clientSecret: process.env.AUTH0_MGMT_CLIENT_SECRET,
-  audience: 'https://${process.env.AUTH0_DOMAIN}/api/v2/',
+  audience: `https://${process.env.AUTH0_DOMAIN}/api/v2/`,
   scope: 'read:users update:users delete:guardian_enrollments'
 });
 
