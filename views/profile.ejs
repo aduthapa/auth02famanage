@@ -4,126 +4,465 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MFA Management | Profile</title>
+  <title>Profile Settings | Account Management</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    .mfa-card {
-      margin-bottom: 20px;
+    .account-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2rem 0;
     }
-    .mfa-method-icon {
-      font-size: 24px;
-      margin-right: 10px;
+    .nav-pills .nav-link {
+      border-radius: 50px;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .nav-pills .nav-link.active {
+      background-color: #667eea;
+    }
+    .card {
+      border: none;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 1.5rem;
+    }
+    .form-control:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .btn-primary {
+      background-color: #667eea;
+      border-color: #667eea;
+    }
+    .profile-avatar {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: #667eea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      color: white;
+      margin: 0 auto 2rem;
+    }
+    .edit-mode {
+      display: none;
+    }
+    .edit-mode.active {
+      display: block;
+    }
+    .view-mode.editing {
+      display: none;
+    }
+    .field-group {
+      margin-bottom: 1.5rem;
+    }
+    .field-label {
+      font-weight: 600;
+      color: #495057;
+      margin-bottom: 0.5rem;
+    }
+    .field-value {
+      font-size: 1.1rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .validation-feedback {
+      display: none;
+      font-size: 0.875rem;
+      margin-top: 0.25rem;
+    }
+    .validation-feedback.show {
+      display: block;
     }
   </style>
 </head>
 <body>
-  <div class="container mt-5">
-    <div class="row">
-      <div class="col-md-8 offset-md-2">
+  <!-- Header -->
+  <div class="account-header">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-md-12 text-center">
+          <h1><i class="bi bi-person-gear me-2"></i>Profile Settings</h1>
+          <p class="mb-0">Manage your personal information and account details</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container mt-4">
+    <!-- Alert Messages -->
+    <% if (typeof success !== 'undefined' && success) { %>
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i><%= success %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i><%= error %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+
+    <!-- Navigation Pills -->
+    <ul class="nav nav-pills justify-content-center mb-4">
+      <li class="nav-item">
+        <a class="nav-link" href="/account">
+          <i class="bi bi-house-door me-2"></i>Overview
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link active" href="/profile">
+          <i class="bi bi-person me-2"></i>Profile
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/security">
+          <i class="bi bi-shield-check me-2"></i>Security
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/change-password">
+          <i class="bi bi-key me-2"></i>Password
+        </a>
+      </li>
+    </ul>
+
+    <div class="row justify-content-center">
+      <div class="col-md-8">
+        <!-- Profile Avatar -->
+        <div class="text-center">
+          <div class="profile-avatar">
+            <% if (user.picture) { %>
+              <img src="<%= user.picture %>" alt="Profile" class="rounded-circle" style="width: 120px; height: 120px;">
+            <% } else { %>
+              <i class="bi bi-person-fill"></i>
+            <% } %>
+          </div>
+        </div>
+
+        <!-- Profile Information Card -->
         <div class="card">
-          <div class="card-header bg-primary text-white">
-            <h2>My Profile</h2>
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="bi bi-person-lines-fill me-2"></i>Personal Information</h5>
+            <div>
+              <button class="btn btn-outline-primary btn-sm" id="editBtn">
+                <i class="bi bi-pencil me-1"></i>Edit
+              </button>
+              <button class="btn btn-success btn-sm edit-mode" id="saveBtn" type="submit" form="profileForm">
+                <i class="bi bi-check-lg me-1"></i>Save Changes
+              </button>
+              <button class="btn btn-secondary btn-sm edit-mode" id="cancelBtn">
+                <i class="bi bi-x-lg me-1"></i>Cancel
+              </button>
+            </div>
           </div>
           <div class="card-body">
-            <div class="mb-4">
-              <h3>User Information</h3>
-              <p><strong>Name:</strong> <%= user.name %></p>
-              <p><strong>Email:</strong> <%= user.email %></p>
-            </div>
-
-            <hr>
-
-            <div class="mb-4">
-              <h3>Your MFA Methods</h3>
-              <% if (mfaEnrollments && mfaEnrollments.length > 0) { %>
-                <div class="row">
-                  <% mfaEnrollments.forEach(enrollment => { %>
-                    <div class="col-md-6">
-                      <div class="card mfa-card">
-                        <div class="card-body">
-                          <h5 class="card-title">
-                            <% if (enrollment.type === 'sms') { %>
-                              <i class="mfa-method-icon">📱</i> SMS
-                            <% } else if (enrollment.type === 'email') { %>
-                              <i class="mfa-method-icon">✉️</i> Email
-                            <% } else if (enrollment.type === 'push-notification') { %>
-                              <i class="mfa-method-icon">🔔</i> Guardian App
-                            <% } else if (enrollment.type === 'otp') { %>
-                              <i class="mfa-method-icon">🔑</i> Google Authenticator
-                            <% } else if (enrollment.type.includes('webauthn')) { %>
-                              <i class="mfa-method-icon">🔐</i> Security Key
-                            <% } else { %>
-                              <i class="mfa-method-icon">🛡️</i> <%= enrollment.type %>
-                            <% } %>
-                          </h5>
-                          <p class="card-text">
-                            <% if (enrollment.name) { %>
-                              <strong>Name:</strong> <%= enrollment.name %><br>
-                            <% } %>
-                            <strong>Added:</strong> <%= new Date(enrollment.created_at).toLocaleDateString() %>
-                          </p>
-                          <form action="/delete-mfa/<%= enrollment.id %>" method="post">
-                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to remove this MFA method?')">
-                              Remove
-                            </button>
-                          </form>
-                        </div>
-                      </div>
-                    </div>
-                  <% }); %>
-                </div>
-              <% } else { %>
-                <div class="alert alert-warning">
-                  You don't have any MFA methods set up yet. Add one below to increase your account security.
-                </div>
-              <% } %>
-            </div>
-
-            <hr>
-
-            <div>
-              <h3>Add New MFA Method</h3>
-              <p>Select a method below to add it to your account:</p>
+            <!-- View Mode -->
+            <div id="viewMode">
+              <div class="field-group">
+                <div class="field-label">Full Name</div>
+                <div class="field-value" id="displayName"><%= user.name || 'Not set' %></div>
+              </div>
               
-              <div class="row">
-                <% availableMethods.forEach(method => { %>
-                  <div class="col-md-4 mb-3">
-                    <div class="card h-100">
-                      <div class="card-body text-center">
-                        <h5 class="card-title">
-                          <% if (method.id === 'sms') { %>
-                            <i class="mfa-method-icon">📱</i>
-                          <% } else if (method.id === 'email') { %>
-                            <i class="mfa-method-icon">✉️</i>
-                          <% } else if (method.id === 'push-notification') { %>
-                            <i class="mfa-method-icon">🔔</i>
-                          <% } else if (method.id === 'otp') { %>
-                            <i class="mfa-method-icon">🔑</i>
-                          <% } else if (method.id.includes('webauthn')) { %>
-                            <i class="mfa-method-icon">🔐</i>
-                          <% } %>
-                          <%= method.name %>
-                        </h5>
-                        <form action="/enroll-mfa" method="post">
-                          <input type="hidden" name="method" value="<%= method.id %>">
-                          <button type="submit" class="btn btn-primary">Add</button>
-                        </form>
-                      </div>
-                    </div>
+              <div class="field-group">
+                <div class="field-label">Email Address</div>
+                <div class="field-value d-flex justify-content-between align-items-center">
+                  <span id="displayEmail"><%= user.email %></span>
+                  <% if (user.email_verified) { %>
+                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Verified</span>
+                  <% } else { %>
+                    <span class="badge bg-warning"><i class="bi bi-exclamation-triangle me-1"></i>Unverified</span>
+                  <% } %>
+                </div>
+              </div>
+
+              <% if (user.username) { %>
+              <div class="field-group">
+                <div class="field-label">Username</div>
+                <div class="field-value" id="displayUsername"><%= user.username %></div>
+              </div>
+              <% } %>
+
+              <div class="field-group">
+                <div class="field-label">Account Created</div>
+                <div class="field-value"><%= new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></div>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label">Last Updated</div>
+                <div class="field-value"><%= new Date(user.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></div>
+              </div>
+            </div>
+
+            <!-- Edit Mode -->
+            <form id="profileForm" action="/update-profile" method="POST" class="edit-mode">
+              <div class="field-group">
+                <label for="name" class="field-label">Full Name</label>
+                <input type="text" class="form-control" id="name" name="name" value="<%= user.name || '' %>" placeholder="Enter your full name">
+                <div class="validation-feedback text-danger" id="nameError"></div>
+              </div>
+
+              <div class="field-group">
+                <label for="email" class="field-label">Email Address</label>
+                <input type="email" class="form-control" id="email" name="email" value="<%= user.email %>" placeholder="Enter your email address">
+                <div class="validation-feedback text-danger" id="emailError"></div>
+                <div class="validation-feedback text-success" id="emailSuccess"></div>
+                <small class="form-text text-muted">Changing your email will require verification</small>
+              </div>
+
+              <div class="field-group">
+                <label for="username" class="field-label">Username</label>
+                <input type="text" class="form-control" id="username" name="username" value="<%= user.username || '' %>" placeholder="Choose a username">
+                <div class="validation-feedback text-danger" id="usernameError"></div>
+                <small class="form-text text-muted">Username must be unique and contain only letters, numbers, and underscores</small>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Account Information Card -->
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-info-circle me-2"></i>Account Information</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="field-group">
+                  <div class="field-label">User ID</div>
+                  <div class="field-value">
+                    <code style="font-size: 0.9rem;"><%= user.user_id %></code>
                   </div>
-                <% }); %>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="field-group">
+                  <div class="field-label">Connection</div>
+                  <div class="field-value">
+                    <% 
+                    let connection = user.user_id.split('|')[0];
+                    let connectionName = connection;
+                    if (connection === 'auth0') connectionName = 'Username-Password';
+                    else if (connection === 'google-oauth2') connectionName = 'Google';
+                    else if (connection === 'facebook') connectionName = 'Facebook';
+                    else if (connection === 'github') connectionName = 'GitHub';
+                    %>
+                    <span class="badge bg-info"><%= connectionName %></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6">
+                <div class="field-group">
+                  <div class="field-label">Login Count</div>
+                  <div class="field-value"><%= user.logins_count || 0 %> times</div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="field-group">
+                  <div class="field-label">Last Login</div>
+                  <div class="field-value">
+                    <% if (user.last_login) { %>
+                      <%= new Date(user.last_login).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                    <% } else { %>
+                      Never
+                    <% } %>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <div class="card-footer">
-            <a href="/" class="btn btn-secondary">Back to Home</a>
-            <a href="/logout" class="btn btn-danger float-end">Logout</a>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-lightning me-2"></i>Quick Actions</h5>
           </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <a href="/change-password" class="btn btn-outline-warning w-100">
+                  <i class="bi bi-key me-2"></i>Change Password
+                </a>
+              </div>
+              <div class="col-md-4 mb-3">
+                <a href="/security" class="btn btn-outline-success w-100">
+                  <i class="bi bi-shield-plus me-2"></i>Setup 2FA
+                </a>
+              </div>
+              <div class="col-md-4 mb-3">
+                <button class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                  <i class="bi bi-trash me-2"></i>Delete Account
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Back Button -->
+        <div class="text-center mt-4 mb-5">
+          <a href="/account" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Back to Account
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Account Modal -->
+  <div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Delete Account</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning">
+            <strong>Warning:</strong> This action cannot be undone. All your data will be permanently deleted.
+          </div>
+          <p>If you're sure you want to delete your account, you can do so from the dedicated page with additional security checks.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <a href="/delete-account" class="btn btn-danger">Proceed to Account Deletion</a>
         </div>
       </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Profile editing functionality
+    const editBtn = document.getElementById('editBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const viewMode = document.getElementById('viewMode');
+    const editModes = document.querySelectorAll('.edit-mode');
+    const profileForm = document.getElementById('profileForm');
+    
+    // Store original values
+    let originalValues = {
+      name: document.getElementById('name').value,
+      email: document.getElementById('email').value,
+      username: document.getElementById('username').value
+    };
+
+    editBtn.addEventListener('click', function() {
+      viewMode.classList.add('editing');
+      editModes.forEach(el => el.classList.add('active'));
+      editBtn.style.display = 'none';
+    });
+
+    cancelBtn.addEventListener('click', function() {
+      viewMode.classList.remove('editing');
+      editModes.forEach(el => el.classList.remove('active'));
+      editBtn.style.display = 'inline-block';
+      
+      // Restore original values
+      document.getElementById('name').value = originalValues.name;
+      document.getElementById('email').value = originalValues.email;
+      document.getElementById('username').value = originalValues.username;
+      
+      // Clear validation messages
+      clearValidationMessages();
+    });
+
+    // Real-time validation
+    document.getElementById('email').addEventListener('blur', async function() {
+      const email = this.value;
+      const emailError = document.getElementById('emailError');
+      const emailSuccess = document.getElementById('emailSuccess');
+      
+      if (email && email !== originalValues.email) {
+        try {
+          const response = await fetch('/api/validate-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+          });
+          const result = await response.json();
+          
+          if (result.available) {
+            emailSuccess.textContent = 'Email address is available';
+            emailSuccess.classList.add('show');
+            emailError.classList.remove('show');
+          } else {
+            emailError.textContent = 'Email address is already in use';
+            emailError.classList.add('show');
+            emailSuccess.classList.remove('show');
+          }
+        } catch (error) {
+          console.error('Email validation error:', error);
+        }
+      } else {
+        emailError.classList.remove('show');
+        emailSuccess.classList.remove('show');
+      }
+    });
+
+    // Username validation
+    document.getElementById('username').addEventListener('input', function() {
+      const username = this.value;
+      const usernameError = document.getElementById('usernameError');
+      
+      if (username) {
+        const isValid = /^[a-zA-Z0-9_]+$/.test(username);
+        if (!isValid) {
+          usernameError.textContent = 'Username can only contain letters, numbers, and underscores';
+          usernameError.classList.add('show');
+        } else {
+          usernameError.classList.remove('show');
+        }
+      } else {
+        usernameError.classList.remove('show');
+      }
+    });
+
+    // Name validation
+    document.getElementById('name').addEventListener('input', function() {
+      const name = this.value;
+      const nameError = document.getElementById('nameError');
+      
+      if (name && name.length < 2) {
+        nameError.textContent = 'Name must be at least 2 characters long';
+        nameError.classList.add('show');
+      } else {
+        nameError.classList.remove('show');
+      }
+    });
+
+    function clearValidationMessages() {
+      document.querySelectorAll('.validation-feedback').forEach(el => {
+        el.classList.remove('show');
+      });
+    }
+
+    // Form submission validation
+    profileForm.addEventListener('submit', function(e) {
+      const name = document.getElementById('name').value;
+      const email = document.getElementById('email').value;
+      
+      if (name && name.length < 2) {
+        e.preventDefault();
+        document.getElementById('nameError').textContent = 'Name must be at least 2 characters long';
+        document.getElementById('nameError').classList.add('show');
+        return;
+      }
+      
+      if (!email || !email.includes('@')) {
+        e.preventDefault();
+        document.getElementById('emailError').textContent = 'Please enter a valid email address';
+        document.getElementById('emailError').classList.add('show');
+        return;
+      }
+    });
+  </script>
 </body>
 </html>
