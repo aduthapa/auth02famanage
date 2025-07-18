@@ -1,4 +1,4 @@
-// index.js - Enhanced Account Management Portal with Individual Field Updates
+// index.js - Complete Enhanced Account Management Portal
 const express = require('express');
 const session = require('express-session');
 const { auth, requiresAuth } = require('express-openid-connect');
@@ -46,7 +46,7 @@ const managementAPI = new ManagementClient({
   clientId: process.env.AUTH0_MGMT_CLIENT_ID,
   clientSecret: process.env.AUTH0_MGMT_CLIENT_SECRET,
   audience: `https://${process.env.AUTH0_TENANT_DOMAIN}/api/v2/`,
-  scope: 'read:users update:users delete:guardian_enrollments create:guardian_enrollment_tickets read:user_idp_tokens'
+  scope: 'read:users update:users delete:guardian_enrollments create:guardian_enrollment_tickets read:user_idp_tokens create:user_tickets'
 });
 
 // Home route
@@ -226,30 +226,134 @@ app.post('/update-profile', requiresAuth(), async (req, res) => {
 });
 
 // Change Password route
-app.get('/change-password', requiresAuth(), (req, res) => {
-  res.render('change-password', { 
-    user: req.oidc.user,
-    success: req.query.success,
-    error: req.query.error
-  });
+app.get('/change-password', requiresAuth(), async (req, res) => {
+  try {
+    const userId = req.oidc.user.sub;
+    const user = await managementAPI.getUser({ id: userId });
+    
+    res.render('change-password', { 
+      user: user,
+      success: req.query.success,
+      error: req.query.error
+    });
+  } catch (error) {
+    console.error('Error fetching user data for password change:', error);
+    res.status(500).render('error', { message: 'Failed to load password change page' });
+  }
 });
 
-// Change Password endpoint
-app.post('/change-password', requiresAuth(), async (req, res) => {
+// Direct Password Change endpoint (new method)
+app.post('/change-password-direct', requiresAuth(), async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+  const userId = req.oidc.user.sub;
+
+  try {
+    // Basic validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.redirect('/change-password?error=All fields are required');
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.redirect('/change-password?error=New passwords do not match');
+    }
+
+    if (newPassword.length < 8) {
+      return res.redirect('/change-password?error=Password must be at least 8 characters long');
+    }
+
+    if (currentPassword === newPassword) {
+      return res.redirect('/change-password?error=New password must be different from current password');
+    }
+
+    // Advanced password validation
+    const passwordRegex = {
+      hasUpper: /[A-Z]/.test(newPassword),
+      hasLower: /[a-z]/.test(newPassword),
+      hasNumber: /\d/.test(newPassword),
+      hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword)
+    };
+
+    const missingRequirements = [];
+    if (!passwordRegex.hasUpper) missingRequirements.push('uppercase letter');
+    if (!passwordRegex.hasLower) missingRequirements.push('lowercase letter');
+    if (!passwordRegex.hasNumber) missingRequirements.push('number');
+    if (!passwordRegex.hasSpecial) missingRequirements.push('special character');
+
+    if (missingRequirements.length > 0) {
+      return res.redirect(`/change-password?error=Password must include: ${missingRequirements.join(', ')}`);
+    }
+
+    // Get user details
+    const user = await managementAPI.getUser({ id: userId });
+    
+    // For Auth0 users (username-password connection), we need to verify current password
+    if (user.user_id.startsWith('auth0|')) {
+      try {
+        // Attempt to authenticate with current credentials to verify current password
+        const response = await fetch(`https://${process.env.AUTH0_TENANT_DOMAIN}/oauth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            grant_type: 'password',
+            username: user.email,
+            password: currentPassword,
+            client_id: process.env.AUTH0_CLIENT_ID,
+            client_secret: process.env.AUTH0_CLIENT_SECRET,
+            scope: 'openid profile email'
+          })
+        });
+
+        if (!response.ok) {
+          return res.redirect('/change-password?error=Current password is incorrect');
+        }
+      } catch (authError) {
+        console.error('Password verification error:', authError);
+        return res.redirect('/change-password?error=Unable to verify current password');
+      }
+    }
+
+    // Update password using Management API
+    await managementAPI.updateUser({ id: userId }, {
+      password: newPassword,
+      connection: user.identities[0].connection
+    });
+
+    res.redirect('/change-password?success=Password updated successfully');
+  } catch (error) {
+    console.error('Error changing password:', error);
+    
+    let errorMessage = 'Failed to update password';
+    
+    if (error.message.includes('PasswordStrengthError')) {
+      errorMessage = 'Password does not meet security requirements';
+    } else if (error.message.includes('PasswordHistoryError')) {
+      errorMessage = 'Cannot reuse a recent password';
+    } else if (error.statusCode === 400) {
+      errorMessage = 'Invalid password format';
+    } else if (error.statusCode === 429) {
+      errorMessage = 'Too many password change attempts. Please try again later.';
+    }
+    
+    res.redirect(`/change-password?error=${encodeURIComponent(errorMessage)}`);
+  }
+});
+
+// Email-based Password Change endpoint (fallback method)
+app.post('/change-password-email', requiresAuth(), async (req, res) => {
   const userId = req.oidc.user.sub;
 
   try {
     // Create a password change ticket
     const ticket = await managementAPI.createPasswordChangeTicket({
       user_id: userId,
-      result_url: `${process.env.BASE_URL}/change-password?success=Password change email sent`,
+      result_url: `${process.env.BASE_URL}/change-password?success=Password changed via email`,
       mark_email_as_verified: true
     });
 
-    res.redirect('/change-password?success=Password change email sent to your registered email address');
+    res.redirect('/change-password?success=Password reset email sent to your registered email address');
   } catch (error) {
     console.error('Error creating password change ticket:', error);
-    res.redirect('/change-password?error=Failed to send password change email');
+    res.redirect('/change-password?error=Failed to send password reset email');
   }
 });
 
@@ -311,11 +415,19 @@ app.post('/delete-mfa/:enrollmentId', requiresAuth(), async (req, res) => {
 });
 
 // Account deletion route
-app.get('/delete-account', requiresAuth(), (req, res) => {
-  res.render('delete-account', { 
-    user: req.oidc.user,
-    error: req.query.error
-  });
+app.get('/delete-account', requiresAuth(), async (req, res) => {
+  try {
+    const userId = req.oidc.user.sub;
+    const user = await managementAPI.getUser({ id: userId });
+    
+    res.render('delete-account', { 
+      user: user,
+      error: req.query.error
+    });
+  } catch (error) {
+    console.error('Error fetching user data for account deletion:', error);
+    res.status(500).render('error', { message: 'Failed to load account deletion page' });
+  }
 });
 
 // Account deletion endpoint
@@ -362,7 +474,7 @@ app.post('/api/validate-email', requiresAuth(), async (req, res) => {
   }
 });
 
-// API endpoint for username validation (optional enhancement)
+// API endpoint for username validation
 app.post('/api/validate-username', requiresAuth(), async (req, res) => {
   const { username } = req.body;
   const userId = req.oidc.user.sub;
@@ -374,8 +486,6 @@ app.post('/api/validate-username', requiresAuth(), async (req, res) => {
     }
 
     // Check if username is already in use
-    // Note: Auth0 doesn't have a direct "getUsersByUsername" method
-    // This is a simplified check - in production you might want to implement this differently
     try {
       const users = await managementAPI.getUsers({
         q: `username:"${username}"`,
@@ -390,6 +500,70 @@ app.post('/api/validate-username', requiresAuth(), async (req, res) => {
   } catch (error) {
     console.error('Username validation error:', error);
     res.json({ available: true });
+  }
+});
+
+// Password validation API endpoint (for real-time validation)
+app.post('/api/validate-password', requiresAuth(), (req, res) => {
+  const { password } = req.body;
+  
+  if (!password) {
+    return res.json({ valid: false, message: 'Password is required' });
+  }
+
+  const checks = {
+    length: password.length >= 8,
+    hasUpper: /[A-Z]/.test(password),
+    hasLower: /[a-z]/.test(password),
+    hasNumber: /\d/.test(password),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+  };
+
+  const isValid = Object.values(checks).every(check => check);
+  const score = Object.values(checks).filter(check => check).length;
+
+  const strengthLevels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  const strength = strengthLevels[Math.min(score, 4)];
+
+  res.json({
+    valid: isValid,
+    strength: strength,
+    score: score,
+    checks: checks
+  });
+});
+
+// Current password verification endpoint (for real-time validation)
+app.post('/api/verify-current-password', requiresAuth(), async (req, res) => {
+  const { currentPassword } = req.body;
+  const userId = req.oidc.user.sub;
+
+  try {
+    const user = await managementAPI.getUser({ id: userId });
+    
+    // Only verify for Auth0 database connections
+    if (!user.user_id.startsWith('auth0|')) {
+      return res.json({ valid: true, message: 'Social login - current password not required' });
+    }
+
+    // Attempt authentication to verify password
+    const response = await fetch(`https://${process.env.AUTH0_TENANT_DOMAIN}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'password',
+        username: user.email,
+        password: currentPassword,
+        client_id: process.env.AUTH0_CLIENT_ID,
+        client_secret: process.env.AUTH0_CLIENT_SECRET,
+        scope: 'openid'
+      })
+    });
+
+    res.json({ valid: response.ok });
+  } catch (error) {
+    console.error('Current password verification error:', error);
+    res.json({ valid: false, message: 'Verification failed' });
   }
 });
 
