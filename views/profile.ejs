@@ -26,14 +26,6 @@
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       margin-bottom: 1.5rem;
     }
-    .form-control:focus {
-      border-color: #667eea;
-      box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-    }
-    .btn-primary {
-      background-color: #667eea;
-      border-color: #667eea;
-    }
     .profile-avatar {
       width: 120px;
       height: 120px;
@@ -46,35 +38,72 @@
       color: white;
       margin: 0 auto 2rem;
     }
-    .edit-mode {
-      display: none;
-    }
-    .edit-mode.active {
-      display: block;
-    }
-    .view-mode.editing {
-      display: none;
-    }
     .field-group {
       margin-bottom: 1.5rem;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+      position: relative;
+    }
+    .field-group:hover {
+      border-color: #667eea;
+      background-color: #f8f9ff;
     }
     .field-label {
       font-weight: 600;
       color: #495057;
       margin-bottom: 0.5rem;
+      font-size: 0.9rem;
     }
     .field-value {
       font-size: 1.1rem;
       padding: 0.5rem 0;
-      border-bottom: 1px solid #e9ecef;
+      color: #212529;
+    }
+    .field-edit-form {
+      display: none;
+    }
+    .field-edit-form.active {
+      display: block;
+    }
+    .field-view.editing {
+      display: none;
+    }
+    .edit-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .field-group:hover .edit-btn {
+      opacity: 1;
     }
     .validation-feedback {
       display: none;
       font-size: 0.875rem;
-      margin-top: 0.25rem;
+      margin-top: 0.5rem;
     }
     .validation-feedback.show {
       display: block;
+    }
+    .field-actions {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .readonly-field {
+      background-color: #f8f9fa;
+      border-color: #dee2e6;
+    }
+    .readonly-field:hover {
+      background-color: #f8f9fa;
+      border-color: #dee2e6;
+    }
+    .verified-badge {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 0.5rem;
     }
   </style>
 </head>
@@ -145,81 +174,138 @@
 
         <!-- Profile Information Card -->
         <div class="card">
-          <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="card-header">
             <h5><i class="bi bi-person-lines-fill me-2"></i>Personal Information</h5>
-            <div>
-              <button class="btn btn-outline-primary btn-sm" id="editBtn">
-                <i class="bi bi-pencil me-1"></i>Edit
-              </button>
-              <button class="btn btn-success btn-sm edit-mode" id="saveBtn" type="submit" form="profileForm">
-                <i class="bi bi-check-lg me-1"></i>Save Changes
-              </button>
-              <button class="btn btn-secondary btn-sm edit-mode" id="cancelBtn">
-                <i class="bi bi-x-lg me-1"></i>Cancel
-              </button>
-            </div>
+            <small class="text-muted">Click edit button on any field to modify it individually</small>
           </div>
           <div class="card-body">
-            <!-- View Mode -->
-            <div id="viewMode">
-              <div class="field-group">
+            <!-- Full Name Field -->
+            <div class="field-group">
+              <button class="btn btn-outline-primary btn-sm edit-btn" onclick="editField('name')">
+                <i class="bi bi-pencil"></i>
+              </button>
+              
+              <div class="field-view" id="name-view">
                 <div class="field-label">Full Name</div>
-                <div class="field-value" id="displayName"><%= user.name || 'Not set' %></div>
+                <div class="field-value"><%= user.name || 'Not set' %></div>
               </div>
               
-              <div class="field-group">
+              <div class="field-edit-form" id="name-edit">
+                <form action="/update-field" method="POST">
+                  <input type="hidden" name="field" value="name">
+                  <div class="field-label">Full Name</div>
+                  <input type="text" class="form-control" name="value" value="<%= user.name || '' %>" 
+                         placeholder="Enter your full name" id="name-input">
+                  <div class="validation-feedback text-danger" id="name-error"></div>
+                  <div class="field-actions">
+                    <button type="submit" class="btn btn-success btn-sm">
+                      <i class="bi bi-check me-1"></i>Save
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="cancelEdit('name')">
+                      <i class="bi bi-x me-1"></i>Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Email Address Field -->
+            <div class="field-group">
+              <button class="btn btn-outline-primary btn-sm edit-btn" onclick="editField('email')">
+                <i class="bi bi-pencil"></i>
+              </button>
+              
+              <div class="field-view" id="email-view">
                 <div class="field-label">Email Address</div>
-                <div class="field-value d-flex justify-content-between align-items-center">
-                  <span id="displayEmail"><%= user.email %></span>
+                <div class="field-value">
+                  <%= user.email %>
                   <% if (user.email_verified) { %>
-                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Verified</span>
+                    <span class="verified-badge">
+                      <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Verified</span>
+                    </span>
                   <% } else { %>
-                    <span class="badge bg-warning"><i class="bi bi-exclamation-triangle me-1"></i>Unverified</span>
+                    <span class="verified-badge">
+                      <span class="badge bg-warning"><i class="bi bi-exclamation-triangle me-1"></i>Unverified</span>
+                    </span>
                   <% } %>
                 </div>
               </div>
-
-              <% if (user.username) { %>
-              <div class="field-group">
-                <div class="field-label">Username</div>
-                <div class="field-value" id="displayUsername"><%= user.username %></div>
-              </div>
-              <% } %>
-
-              <div class="field-group">
-                <div class="field-label">Account Created</div>
-                <div class="field-value"><%= new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></div>
-              </div>
-
-              <div class="field-group">
-                <div class="field-label">Last Updated</div>
-                <div class="field-value"><%= new Date(user.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></div>
+              
+              <div class="field-edit-form" id="email-edit">
+                <form action="/update-field" method="POST">
+                  <input type="hidden" name="field" value="email">
+                  <div class="field-label">Email Address</div>
+                  <input type="email" class="form-control" name="value" value="<%= user.email %>" 
+                         placeholder="Enter your email address" id="email-input">
+                  <div class="validation-feedback text-danger" id="email-error"></div>
+                  <div class="validation-feedback text-success" id="email-success"></div>
+                  <small class="form-text text-muted">Changing your email will require verification</small>
+                  <div class="field-actions">
+                    <button type="submit" class="btn btn-success btn-sm" id="email-save-btn">
+                      <i class="bi bi-check me-1"></i>Save
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="cancelEdit('email')">
+                      <i class="bi bi-x me-1"></i>Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
 
-            <!-- Edit Mode -->
-            <form id="profileForm" action="/update-profile" method="POST" class="edit-mode">
-              <div class="field-group">
-                <label for="name" class="field-label">Full Name</label>
-                <input type="text" class="form-control" id="name" name="name" value="<%= user.name || '' %>" placeholder="Enter your full name">
-                <div class="validation-feedback text-danger" id="nameError"></div>
+            <!-- Username Field -->
+            <div class="field-group">
+              <button class="btn btn-outline-primary btn-sm edit-btn" onclick="editField('username')">
+                <i class="bi bi-pencil"></i>
+              </button>
+              
+              <div class="field-view" id="username-view">
+                <div class="field-label">Username</div>
+                <div class="field-value"><%= user.username || 'Not set' %></div>
               </div>
+              
+              <div class="field-edit-form" id="username-edit">
+                <form action="/update-field" method="POST">
+                  <input type="hidden" name="field" value="username">
+                  <div class="field-label">Username</div>
+                  <input type="text" class="form-control" name="value" value="<%= user.username || '' %>" 
+                         placeholder="Choose a username" id="username-input">
+                  <div class="validation-feedback text-danger" id="username-error"></div>
+                  <small class="form-text text-muted">Username must be unique and contain only letters, numbers, and underscores</small>
+                  <div class="field-actions">
+                    <button type="submit" class="btn btn-success btn-sm">
+                      <i class="bi bi-check me-1"></i>Save
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="cancelEdit('username')">
+                      <i class="bi bi-x me-1"></i>Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
 
-              <div class="field-group">
-                <label for="email" class="field-label">Email Address</label>
-                <input type="email" class="form-control" id="email" name="email" value="<%= user.email %>" placeholder="Enter your email address">
-                <div class="validation-feedback text-danger" id="emailError"></div>
-                <div class="validation-feedback text-success" id="emailSuccess"></div>
-                <small class="form-text text-muted">Changing your email will require verification</small>
+            <!-- Account Created (Read-only) -->
+            <div class="field-group readonly-field">
+              <div class="field-label">Account Created</div>
+              <div class="field-value">
+                <%= new Date(user.created_at).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                }) %>
               </div>
+            </div>
 
-              <div class="field-group">
-                <label for="username" class="field-label">Username</label>
-                <input type="text" class="form-control" id="username" name="username" value="<%= user.username || '' %>" placeholder="Choose a username">
-                <div class="validation-feedback text-danger" id="usernameError"></div>
-                <small class="form-text text-muted">Username must be unique and contain only letters, numbers, and underscores</small>
+            <!-- Last Updated (Read-only) -->
+            <div class="field-group readonly-field">
+              <div class="field-label">Last Updated</div>
+              <div class="field-value">
+                <%= new Date(user.updated_at).toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                }) %>
               </div>
-            </form>
+            </div>
           </div>
         </div>
 
@@ -231,7 +317,7 @@
           <div class="card-body">
             <div class="row">
               <div class="col-md-6">
-                <div class="field-group">
+                <div class="field-group readonly-field">
                   <div class="field-label">User ID</div>
                   <div class="field-value">
                     <code style="font-size: 0.9rem;"><%= user.user_id %></code>
@@ -239,7 +325,7 @@
                 </div>
               </div>
               <div class="col-md-6">
-                <div class="field-group">
+                <div class="field-group readonly-field">
                   <div class="field-label">Connection</div>
                   <div class="field-value">
                     <% 
@@ -258,17 +344,23 @@
 
             <div class="row">
               <div class="col-md-6">
-                <div class="field-group">
+                <div class="field-group readonly-field">
                   <div class="field-label">Login Count</div>
                   <div class="field-value"><%= user.logins_count || 0 %> times</div>
                 </div>
               </div>
               <div class="col-md-6">
-                <div class="field-group">
+                <div class="field-group readonly-field">
                   <div class="field-label">Last Login</div>
                   <div class="field-value">
                     <% if (user.last_login) { %>
-                      <%= new Date(user.last_login).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                      <%= new Date(user.last_login).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      }) %>
                     <% } else { %>
                       Never
                     <% } %>
@@ -339,48 +431,69 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // Profile editing functionality
-    const editBtn = document.getElementById('editBtn');
-    const saveBtn = document.getElementById('saveBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
-    const viewMode = document.getElementById('viewMode');
-    const editModes = document.querySelectorAll('.edit-mode');
-    const profileForm = document.getElementById('profileForm');
-    
     // Store original values
-    let originalValues = {
-      name: document.getElementById('name').value,
-      email: document.getElementById('email').value,
-      username: document.getElementById('username').value
+    const originalValues = {
+      name: '<%= user.name || "" %>',
+      email: '<%= user.email %>',
+      username: '<%= user.username || "" %>'
     };
 
-    editBtn.addEventListener('click', function() {
-      viewMode.classList.add('editing');
-      editModes.forEach(el => el.classList.add('active'));
-      editBtn.style.display = 'none';
-    });
+    function editField(fieldName) {
+      // Hide all other edit forms
+      ['name', 'email', 'username'].forEach(field => {
+        if (field !== fieldName) {
+          cancelEdit(field);
+        }
+      });
 
-    cancelBtn.addEventListener('click', function() {
-      viewMode.classList.remove('editing');
-      editModes.forEach(el => el.classList.remove('active'));
-      editBtn.style.display = 'inline-block';
+      const viewDiv = document.getElementById(`${fieldName}-view`);
+      const editDiv = document.getElementById(`${fieldName}-edit`);
+      const input = document.getElementById(`${fieldName}-input`);
       
-      // Restore original values
-      document.getElementById('name').value = originalValues.name;
-      document.getElementById('email').value = originalValues.email;
-      document.getElementById('username').value = originalValues.username;
+      viewDiv.classList.add('editing');
+      editDiv.classList.add('active');
+      input.focus();
+      
+      // Clear any previous validation messages
+      clearValidationMessages(fieldName);
+    }
+
+    function cancelEdit(fieldName) {
+      const viewDiv = document.getElementById(`${fieldName}-view`);
+      const editDiv = document.getElementById(`${fieldName}-edit`);
+      const input = document.getElementById(`${fieldName}-input`);
+      
+      viewDiv.classList.remove('editing');
+      editDiv.classList.remove('active');
+      
+      // Restore original value
+      input.value = originalValues[fieldName];
       
       // Clear validation messages
-      clearValidationMessages();
-    });
+      clearValidationMessages(fieldName);
+    }
 
-    // Real-time validation
-    document.getElementById('email').addEventListener('blur', async function() {
-      const email = this.value;
-      const emailError = document.getElementById('emailError');
-      const emailSuccess = document.getElementById('emailSuccess');
+    function clearValidationMessages(fieldName) {
+      const errorEl = document.getElementById(`${fieldName}-error`);
+      const successEl = document.getElementById(`${fieldName}-success`);
       
-      if (email && email !== originalValues.email) {
+      if (errorEl) errorEl.classList.remove('show');
+      if (successEl) successEl.classList.remove('show');
+    }
+
+    // Real-time email validation
+    document.getElementById('email-input').addEventListener('blur', async function() {
+      const email = this.value.trim();
+      const currentEmail = originalValues.email;
+      const errorEl = document.getElementById('email-error');
+      const successEl = document.getElementById('email-success');
+      const saveBtn = document.getElementById('email-save-btn');
+      
+      // Clear previous messages
+      errorEl.classList.remove('show');
+      successEl.classList.remove('show');
+      
+      if (email && email !== currentEmail) {
         try {
           const response = await fetch('/api/validate-email', {
             method: 'POST',
@@ -390,78 +503,95 @@
           const result = await response.json();
           
           if (result.available) {
-            emailSuccess.textContent = 'Email address is available';
-            emailSuccess.classList.add('show');
-            emailError.classList.remove('show');
+            successEl.textContent = 'Email address is available';
+            successEl.classList.add('show');
+            saveBtn.disabled = false;
           } else {
-            emailError.textContent = 'Email address is already in use';
-            emailError.classList.add('show');
-            emailSuccess.classList.remove('show');
+            errorEl.textContent = 'Email address is already in use';
+            errorEl.classList.add('show');
+            saveBtn.disabled = true;
           }
         } catch (error) {
           console.error('Email validation error:', error);
+          saveBtn.disabled = false; // Allow submission if validation fails
         }
       } else {
-        emailError.classList.remove('show');
-        emailSuccess.classList.remove('show');
+        saveBtn.disabled = false;
       }
     });
 
     // Username validation
-    document.getElementById('username').addEventListener('input', function() {
-      const username = this.value;
-      const usernameError = document.getElementById('usernameError');
+    document.getElementById('username-input').addEventListener('input', function() {
+      const username = this.value.trim();
+      const errorEl = document.getElementById('username-error');
       
       if (username) {
         const isValid = /^[a-zA-Z0-9_]+$/.test(username);
         if (!isValid) {
-          usernameError.textContent = 'Username can only contain letters, numbers, and underscores';
-          usernameError.classList.add('show');
+          errorEl.textContent = 'Username can only contain letters, numbers, and underscores';
+          errorEl.classList.add('show');
         } else {
-          usernameError.classList.remove('show');
+          errorEl.classList.remove('show');
         }
       } else {
-        usernameError.classList.remove('show');
+        errorEl.classList.remove('show');
       }
     });
 
     // Name validation
-    document.getElementById('name').addEventListener('input', function() {
-      const name = this.value;
-      const nameError = document.getElementById('nameError');
+    document.getElementById('name-input').addEventListener('input', function() {
+      const name = this.value.trim();
+      const errorEl = document.getElementById('name-error');
       
       if (name && name.length < 2) {
-        nameError.textContent = 'Name must be at least 2 characters long';
-        nameError.classList.add('show');
+        errorEl.textContent = 'Name must be at least 2 characters long';
+        errorEl.classList.add('show');
       } else {
-        nameError.classList.remove('show');
+        errorEl.classList.remove('show');
       }
     });
 
-    function clearValidationMessages() {
-      document.querySelectorAll('.validation-feedback').forEach(el => {
-        el.classList.remove('show');
+    // Handle form submissions
+    document.querySelectorAll('.field-edit-form form').forEach(form => {
+      form.addEventListener('submit', function(e) {
+        const fieldName = this.querySelector('input[name="field"]').value;
+        const value = this.querySelector('input[name="value"]').value.trim();
+        
+        // Basic validation
+        if (fieldName === 'name' && value && value.length < 2) {
+          e.preventDefault();
+          document.getElementById('name-error').textContent = 'Name must be at least 2 characters long';
+          document.getElementById('name-error').classList.add('show');
+          return;
+        }
+        
+        if (fieldName === 'email' && (!value || !value.includes('@'))) {
+          e.preventDefault();
+          document.getElementById('email-error').textContent = 'Please enter a valid email address';
+          document.getElementById('email-error').classList.add('show');
+          return;
+        }
+        
+        if (fieldName === 'username' && value && !/^[a-zA-Z0-9_]+$/.test(value)) {
+          e.preventDefault();
+          document.getElementById('username-error').textContent = 'Username can only contain letters, numbers, and underscores';
+          document.getElementById('username-error').classList.add('show');
+          return;
+        }
       });
-    }
+    });
 
-    // Form submission validation
-    profileForm.addEventListener('submit', function(e) {
-      const name = document.getElementById('name').value;
-      const email = document.getElementById('email').value;
-      
-      if (name && name.length < 2) {
-        e.preventDefault();
-        document.getElementById('nameError').textContent = 'Name must be at least 2 characters long';
-        document.getElementById('nameError').classList.add('show');
-        return;
-      }
-      
-      if (!email || !email.includes('@')) {
-        e.preventDefault();
-        document.getElementById('emailError').textContent = 'Please enter a valid email address';
-        document.getElementById('emailError').classList.add('show');
-        return;
-      }
+    // Auto-dismiss alerts
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+          const bsAlert = new bootstrap.Alert(alert);
+          if (bsAlert) {
+            setTimeout(() => bsAlert.close(), 5000);
+          }
+        });
+      }, 1000);
     });
   </script>
 </body>
