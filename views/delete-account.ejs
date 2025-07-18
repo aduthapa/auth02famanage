@@ -1,0 +1,358 @@
+<!-- views/delete-account.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delete Account | Account Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .danger-header {
+      background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+      color: white;
+      padding: 2rem 0;
+    }
+    .danger-zone {
+      border: 2px solid #dc3545;
+      border-radius: 10px;
+      background: #fff5f5;
+      padding: 2rem;
+      margin: 2rem 0;
+    }
+    .warning-icon {
+      font-size: 4rem;
+      color: #dc3545;
+      margin-bottom: 1rem;
+    }
+    .confirmation-input {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    .checklist-item {
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+      transition: all 0.3s ease;
+    }
+    .checklist-item.checked {
+      background: #d4edda;
+      border-color: #c3e6cb;
+    }
+    .countdown {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #dc3545;
+    }
+  </style>
+</head>
+<body>
+  <!-- Danger Header -->
+  <div class="danger-header">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-md-12 text-center">
+          <h1><i class="bi bi-exclamation-triangle me-2"></i>Delete Account</h1>
+          <p class="mb-0">Permanently remove your account and all associated data</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container mt-4">
+    <!-- Alert Messages -->
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i><%= error %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+
+    <div class="row justify-content-center">
+      <div class="col-md-8">
+        <!-- Warning Section -->
+        <div class="text-center mb-4">
+          <div class="warning-icon">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+          </div>
+          <h2 class="text-danger fw-bold">Warning: This Action Cannot Be Undone</h2>
+          <p class="lead text-muted">
+            Account deletion is permanent and irreversible. Please read carefully before proceeding.
+          </p>
+        </div>
+
+        <!-- What Will Be Deleted -->
+        <div class="card">
+          <div class="card-header bg-danger text-white">
+            <h5><i class="bi bi-trash me-2"></i>What Will Be Deleted</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <ul class="list-unstyled">
+                  <li class="mb-2"><i class="bi bi-x-circle text-danger me-2"></i>Profile information</li>
+                  <li class="mb-2"><i class="bi bi-x-circle text-danger me-2"></i>Email and username</li>
+                  <li class="mb-2"><i class="bi bi-x-circle text-danger me-2"></i>Login history</li>
+                </ul>
+              </div>
+              <div class="col-md-6">
+                <ul class="list-unstyled">
+                  <li class="mb-2"><i class="bi bi-x-circle text-danger me-2"></i>All MFA methods</li>
+                  <li class="mb-2"><i class="bi bi-x-circle text-danger me-2"></i>Security settings</li>
+                  <li class="mb-2"><i class="bi bi-x-circle text-danger me-2"></i>Account preferences</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div class="alert alert-warning mt-3">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              <strong>Important:</strong> Once deleted, this data cannot be recovered, even by our support team.
+            </div>
+          </div>
+        </div>
+
+        <!-- Before You Delete Checklist -->
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-list-check me-2"></i>Before You Delete Your Account</h5>
+          </div>
+          <div class="card-body">
+            <p class="text-muted mb-3">Please ensure you've completed the following steps:</p>
+            
+            <div class="checklist-item" data-check="backup">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="backup-check">
+                <label class="form-check-label" for="backup-check">
+                  <strong>Backup Important Data</strong><br>
+                  <small class="text-muted">Download or save any important information from your account</small>
+                </label>
+              </div>
+            </div>
+            
+            <div class="checklist-item" data-check="services">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="services-check">
+                <label class="form-check-label" for="services-check">
+                  <strong>Update Connected Services</strong><br>
+                  <small class="text-muted">Remove this account from any third-party services or applications</small>
+                </label>
+              </div>
+            </div>
+            
+            <div class="checklist-item" data-check="alternatives">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="alternatives-check">
+                <label class="form-check-label" for="alternatives-check">
+                  <strong>Consider Alternatives</strong><br>
+                  <small class="text-muted">Have you considered deactivating instead of deleting your account?</small>
+                </label>
+              </div>
+            </div>
+            
+            <div class="checklist-item" data-check="understand">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="understand-check">
+                <label class="form-check-label" for="understand-check">
+                  <strong>I Understand This Is Permanent</strong><br>
+                  <small class="text-muted">I acknowledge that account deletion cannot be reversed</small>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Account Information -->
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-person-x me-2"></i>Account to be Deleted</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <strong>Name:</strong> <%= user.name || 'Not set' %>
+              </div>
+              <div class="col-md-6">
+                <strong>Email:</strong> <%= user.email %>
+              </div>
+            </div>
+            <div class="row mt-2">
+              <div class="col-md-6">
+                <strong>Account Created:</strong> <%= new Date(user.created_at).toLocaleDateString() %>
+              </div>
+              <div class="col-md-6">
+                <strong>User ID:</strong> <code style="font-size: 0.8rem;"><%= user.user_id %></code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="danger-zone">
+          <div class="text-center">
+            <h4 class="text-danger fw-bold mb-3">
+              <i class="bi bi-skull me-2"></i>Danger Zone
+            </h4>
+            
+            <div class="alert alert-danger mb-4">
+              <strong>Final Warning:</strong> This action will permanently delete your account and all associated data. 
+              This cannot be undone, recovered, or reversed.
+            </div>
+
+            <form id="deleteForm" action="/delete-account" method="POST">
+              <div class="mb-4">
+                <label for="confirmation" class="form-label fw-bold">
+                  Type <code>DELETE</code> to confirm account deletion:
+                </label>
+                <input 
+                  type="text" 
+                  class="form-control confirmation-input text-center" 
+                  id="confirmation" 
+                  name="confirmation" 
+                  placeholder="Type DELETE here"
+                  required
+                >
+              </div>
+              
+              <div class="mb-4">
+                <div class="countdown" id="countdown" style="display: none;">
+                  You can submit in <span id="timer">10</span> seconds...
+                </div>
+              </div>
+              
+              <button 
+                type="submit" 
+                class="btn btn-danger btn-lg" 
+                id="deleteButton"
+                disabled
+              >
+                <i class="bi bi-trash me-2"></i>Permanently Delete My Account
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Alternative Actions -->
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-lightbulb me-2"></i>Looking for Alternatives?</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <h6>Update Your Profile</h6>
+                <p class="text-muted small">Modify your account information instead of deleting</p>
+                <a href="/profile" class="btn btn-outline-primary btn-sm">
+                  <i class="bi bi-pencil me-1"></i>Edit Profile
+                </a>
+              </div>
+              
+              <div class="col-md-6 mb-3">
+                <h6>Enhance Security</h6>
+                <p class="text-muted small">Secure your account with better authentication</p>
+                <a href="/security" class="btn btn-outline-success btn-sm">
+                  <i class="bi bi-shield-plus me-1"></i>Security Settings
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Back Button -->
+        <div class="text-center mt-4 mb-5">
+          <a href="/account" class="btn btn-outline-secondary btn-lg">
+            <i class="bi bi-arrow-left me-2"></i>Cancel and Go Back
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const checkboxes = document.querySelectorAll('.checklist-item input[type="checkbox"]');
+      const confirmationInput = document.getElementById('confirmation');
+      const deleteButton = document.getElementById('deleteButton');
+      const countdownDiv = document.getElementById('countdown');
+      const timerSpan = document.getElementById('timer');
+      const deleteForm = document.getElementById('deleteForm');
+      
+      let countdownStarted = false;
+      let timeLeft = 10;
+
+      // Handle checklist items
+      checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          const item = this.closest('.checklist-item');
+          if (this.checked) {
+            item.classList.add('checked');
+          } else {
+            item.classList.remove('checked');
+          }
+          checkFormValid();
+        });
+      });
+
+      // Handle confirmation input
+      confirmationInput.addEventListener('input', function() {
+        checkFormValid();
+      });
+
+      function checkFormValid() {
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        const confirmationValid = confirmationInput.value.trim() === 'DELETE';
+        
+        if (allChecked && confirmationValid && !countdownStarted) {
+          startCountdown();
+        } else if (!allChecked || !confirmationValid) {
+          stopCountdown();
+        }
+      }
+
+      function startCountdown() {
+        countdownStarted = true;
+        countdownDiv.style.display = 'block';
+        deleteButton.disabled = true;
+        
+        const timer = setInterval(() => {
+          timeLeft--;
+          timerSpan.textContent = timeLeft;
+          
+          if (timeLeft <= 0) {
+            clearInterval(timer);
+            deleteButton.disabled = false;
+            countdownDiv.innerHTML = '<i class="bi bi-check-circle text-success me-2"></i>You may now proceed with account deletion';
+            countdownDiv.className = 'text-success fw-bold';
+          }
+        }, 1000);
+      }
+
+      function stopCountdown() {
+        countdownStarted = false;
+        timeLeft = 10;
+        countdownDiv.style.display = 'none';
+        deleteButton.disabled = true;
+        timerSpan.textContent = timeLeft;
+        countdownDiv.className = 'countdown';
+      }
+
+      // Final confirmation before submission
+      deleteForm.addEventListener('submit', function(e) {
+        if (!confirm('ARE YOU ABSOLUTELY SURE? This will permanently delete your account and cannot be undone!')) {
+          e.preventDefault();
+        }
+      });
+
+      // Warning when leaving page
+      window.addEventListener('beforeunload', function(e) {
+        if (confirmationInput.value.trim() === 'DELETE') {
+          e.preventDefault();
+          e.returnValue = 'Are you sure you want to leave? Your account deletion process will be cancelled.';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
