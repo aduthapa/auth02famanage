@@ -1,8 +1,11 @@
 {
-  "name": "auth0-mfa-management",
-  "version": "1.0.0",
-  "description": "Manage Auth0 MFA methods portal",
+  "name": "auth0-account-management",
+  "version": "2.0.0",
+  "description": "Comprehensive Auth0 Account Management Portal",
   "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
@@ -17,5 +20,14 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
-  }
+  },
+  "keywords": [
+    "auth0",
+    "account-management", 
+    "mfa",
+    "security",
+    "profile-management"
+  ],
+  "author": "Your Name",
+  "license": "GPL-3.0"
 }
