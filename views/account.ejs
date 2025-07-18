@@ -1,0 +1,248 @@
+<!-- views/account.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Account | <%= user.name || user.email %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .account-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 3rem 0;
+    }
+    .nav-pills .nav-link {
+      border-radius: 50px;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .nav-pills .nav-link.active {
+      background-color: #667eea;
+    }
+    .card {
+      border: none;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 1.5rem;
+    }
+    .stats-card {
+      text-align: center;
+      padding: 2rem;
+    }
+    .stats-number {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #667eea;
+    }
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #667eea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: white;
+      margin: 0 auto 1rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="account-header">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-md-2 text-center">
+          <div class="avatar">
+            <% if (user.picture) { %>
+              <img src="<%= user.picture %>" alt="Profile" class="rounded-circle" style="width: 80px; height: 80px;">
+            <% } else { %>
+              <i class="bi bi-person-fill"></i>
+            <% } %>
+          </div>
+        </div>
+        <div class="col-md-10">
+          <h1 class="mb-1"><%= user.name || user.email %></h1>
+          <p class="mb-2"><%= user.email %></p>
+          <small>Account created: <%= new Date(user.created_at).toLocaleDateString() %></small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container mt-4">
+    <!-- Alert Messages -->
+    <% if (typeof success !== 'undefined' && success) { %>
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <%= success %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <%= error %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+
+    <!-- Navigation Pills -->
+    <ul class="nav nav-pills justify-content-center mb-4">
+      <li class="nav-item">
+        <a class="nav-link active" href="/account">
+          <i class="bi bi-house-door me-2"></i>Overview
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/profile">
+          <i class="bi bi-person me-2"></i>Profile
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/security">
+          <i class="bi bi-shield-check me-2"></i>Security
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/change-password">
+          <i class="bi bi-key me-2"></i>Password
+        </a>
+      </li>
+    </ul>
+
+    <!-- Stats Row -->
+    <div class="row">
+      <div class="col-md-4">
+        <div class="card stats-card">
+          <div class="stats-number"><%= mfaEnrollments.length %></div>
+          <h5>MFA Methods</h5>
+          <p class="text-muted">Active security methods</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card stats-card">
+          <div class="stats-number">
+            <% if (user.email_verified) { %>
+              <i class="bi bi-check-circle-fill text-success"></i>
+            <% } else { %>
+              <i class="bi bi-x-circle-fill text-danger"></i>
+            <% } %>
+          </div>
+          <h5>Email Status</h5>
+          <p class="text-muted">
+            <%= user.email_verified ? 'Verified' : 'Unverified' %>
+          </p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card stats-card">
+          <div class="stats-number">
+            <%= Math.floor((new Date() - new Date(user.created_at)) / (1000 * 60 * 60 * 24)) %>
+          </div>
+          <h5>Days Active</h5>
+          <p class="text-muted">Since account creation</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-person-gear me-2"></i>Profile Settings</h5>
+          </div>
+          <div class="card-body">
+            <p>Manage your personal information and account details.</p>
+            <a href="/profile" class="btn btn-primary">
+              <i class="bi bi-pencil me-2"></i>Edit Profile
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-shield-lock me-2"></i>Security Settings</h5>
+          </div>
+          <div class="card-body">
+            <p>Configure two-factor authentication and security options.</p>
+            <a href="/security" class="btn btn-success">
+              <i class="bi bi-shield-plus me-2"></i>Manage Security
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent MFA Methods -->
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="bi bi-clock-history me-2"></i>Your Security Methods</h5>
+      </div>
+      <div class="card-body">
+        <% if (mfaEnrollments && mfaEnrollments.length > 0) { %>
+          <div class="row">
+            <% mfaEnrollments.slice(0, 3).forEach(enrollment => { %>
+              <div class="col-md-4 mb-3">
+                <div class="d-flex align-items-center">
+                  <div class="me-3">
+                    <% if (enrollment.type === 'sms') { %>
+                      <i class="bi bi-phone" style="font-size: 1.5rem; color: #667eea;"></i>
+                    <% } else if (enrollment.type === 'email') { %>
+                      <i class="bi bi-envelope" style="font-size: 1.5rem; color: #667eea;"></i>
+                    <% } else if (enrollment.type === 'push-notification') { %>
+                      <i class="bi bi-bell" style="font-size: 1.5rem; color: #667eea;"></i>
+                    <% } else if (enrollment.type === 'otp') { %>
+                      <i class="bi bi-key" style="font-size: 1.5rem; color: #667eea;"></i>
+                    <% } else { %>
+                      <i class="bi bi-shield-check" style="font-size: 1.5rem; color: #667eea;"></i>
+                    <% } %>
+                  </div>
+                  <div>
+                    <h6 class="mb-0">
+                      <% if (enrollment.type === 'sms') { %>SMS Authentication
+                      <% } else if (enrollment.type === 'email') { %>Email Authentication
+                      <% } else if (enrollment.type === 'push-notification') { %>Guardian App
+                      <% } else if (enrollment.type === 'otp') { %>Authenticator App
+                      <% } else { %>Security Key<% } %>
+                    </h6>
+                    <small class="text-muted">
+                      Added <%= new Date(enrollment.created_at).toLocaleDateString() %>
+                    </small>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+          <% if (mfaEnrollments.length > 3) { %>
+            <a href="/security" class="btn btn-outline-primary btn-sm">
+              View all <%= mfaEnrollments.length %> methods
+            </a>
+          <% } %>
+        <% } else { %>
+          <div class="text-center py-4">
+            <i class="bi bi-shield-x" style="font-size: 3rem; color: #dc3545;"></i>
+            <h5 class="mt-3">No security methods configured</h5>
+            <p class="text-muted">Add two-factor authentication to secure your account</p>
+            <a href="/security" class="btn btn-danger">Set up 2FA</a>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="text-center mt-4 mb-5">
+      <a href="/" class="btn btn-outline-secondary me-2">
+        <i class="bi bi-house me-2"></i>Home
+      </a>
+      <a href="/logout" class="btn btn-outline-danger">
+        <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+      </a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
