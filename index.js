@@ -730,16 +730,21 @@ function generateLoginUrl(client) {
       // SAML SSO URL
       return `${baseUrl}/samlp/${client.client_id}`;
     
+    case 'sso_integration':
+      // For Google Workspace and other SSO integrations
+      return `${baseUrl}/authorize?client_id=${client.client_id}&response_type=code&redirect_uri=${encodeURIComponent((client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`)}&scope=openid profile email&prompt=none`;
+    
     case 'spa':
     case 'regular_web':
     case 'native':
-      // OAuth/OIDC SSO URL
+      // OAuth/OIDC SSO URL with silent authentication
       const redirectUri = (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
       return `${baseUrl}/authorize?` +
         `client_id=${client.client_id}&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `scope=openid profile email`;
+        `scope=openid profile email&` +
+        `prompt=none`; // This enables silent authentication
     
     default:
       return null;
