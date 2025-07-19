@@ -201,6 +201,15 @@
   </style>
 </head>
 <body>
+  <!-- Pass server configuration to client-side JavaScript -->
+  <script>
+    window.AUTH0_CONFIG = {
+      customDomain: '<%= auth0Config.customDomain %>',
+      tenantDomain: '<%= auth0Config.tenantDomain %>',
+      baseUrl: '<%= auth0Config.baseUrl %>'
+    };
+  </script>
+
   <!-- Header -->
   <div class="account-header">
     <div class="container">
@@ -439,6 +448,7 @@
 
     // Initialize page
     document.addEventListener('DOMContentLoaded', function() {
+      console.log('Apps page loaded, starting to fetch applications...');
       loadApplications();
       setupEventListeners();
     });
@@ -460,22 +470,37 @@
     }
 
     function loadApplications() {
+      console.log('Fetching applications from /api/applications...');
+      
       // Show loading state
       document.getElementById('loadingState').style.display = 'block';
       document.getElementById('appsGrid').style.display = 'none';
       
       // Fetch applications from server
       fetch('/api/applications')
-        .then(response => response.json())
+        .then(response => {
+          console.log('Applications API response status:', response.status);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
         .then(data => {
-          allApps = data.applications || [];
-          updateStats();
-          renderApps();
-          loadRecentActivity();
+          console.log('Applications API response:', data);
+          if (data.success) {
+            allApps = data.applications || [];
+            console.log(`Loaded ${allApps.length} applications:`, allApps.map(app => ({ name: app.name, type: app.app_type })));
+            filteredApps = [...allApps]; // Initialize filtered apps
+            updateStats();
+            renderApps();
+            loadRecentActivity();
+          } else {
+            throw new Error(data.error || 'Failed to load applications');
+          }
         })
         .catch(error => {
           console.error('Error loading applications:', error);
-          showError('Failed to load applications');
+          showError('Failed to load applications: ' + error.message);
         })
         .finally(() => {
           document.getElementById('loadingState').style.display = 'none';
@@ -484,6 +509,7 @@
     }
 
     function renderApps() {
+      console.log(`Rendering ${filteredApps.length} applications`);
       const grid = document.getElementById('appsGrid');
       const noAppsMessage = document.getElementById('noAppsMessage');
       
@@ -512,7 +538,7 @@
           </span>
           
           <div class="app-icon">
-            ${app.logo_uri ? `<img src="${app.logo_uri}" alt="${app.name}" style="width: 100%; height: 100%; object-fit: contain;">` : getAppIcon(app.name)}
+            ${app.logo_uri ? `<img src="${app.logo_uri}" alt="${app.name}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px;">` : getAppIcon(app.name)}
           </div>
           
           <h6 class="fw-bold mb-1">${app.name}</h6>
@@ -527,6 +553,8 @@
     }
 
     function launchApp(clientId, loginUrl) {
+      console.log('Launching app:', clientId);
+      
       // Record app launch
       recordAppLaunch(clientId);
       
@@ -534,8 +562,10 @@
       if (loginUrl) {
         window.open(loginUrl, '_blank');
       } else {
-        // Construct SSO URL
-        const ssoUrl = \`https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}/authorize?client_id=\${clientId}&response_type=code&redirect_uri=\${encodeURIComponent(window.location.origin)}&scope=openid profile email\`;
+        // Construct SSO URL using the config passed from server
+        const baseUrl = `https://${window.AUTH0_CONFIG.customDomain || window.AUTH0_CONFIG.tenantDomain}`;
+        const ssoUrl = `${baseUrl}/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(window.AUTH0_CONFIG.baseUrl + '/apps')}&scope=openid profile email`;
+        console.log('Opening SSO URL:', ssoUrl);
         window.open(ssoUrl, '_blank');
       }
     }
@@ -572,6 +602,7 @@
         return matchesSearch && matchesFilter;
       });
       
+      console.log(`Filtered to ${filteredApps.length} applications`);
       renderApps();
     }
 
@@ -582,7 +613,7 @@
       document.querySelectorAll('[data-filter]').forEach(tab => {
         tab.classList.remove('active');
       });
-      document.querySelector(\`[data-filter="\${filter}"]\`).classList.add('active');
+      document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
       
       filterApps();
     }
@@ -616,6 +647,7 @@
       document.getElementById('totalApps').textContent = allApps.length;
       document.getElementById('favoriteApps').textContent = favorites.length;
       document.getElementById('ssoEnabled').textContent = allApps.filter(app => !app.sso_disabled).length;
+      document.getElementById('recentLogins').textContent = getRecentlyUsedApps().length;
       
       updateFilterCounts();
     }
@@ -630,17 +662,17 @@
 
     function loadRecentActivity() {
       const recentApps = getRecentlyUsedApps().slice(0, 5);
-      const activityHtml = recentApps.map(app => \`
+      const activityHtml = recentApps.map(app => `
         <div class="activity-item">
           <div class="activity-icon">
             <i class="bi bi-box-arrow-up-right"></i>
           </div>
           <div class="flex-grow-1">
-            <div class="fw-bold small">\${app.name}</div>
-            <div class="text-muted small">\${formatRelativeTime(getLastUsed(app.client_id))}</div>
+            <div class="fw-bold small">${app.name}</div>
+            <div class="text-muted small">${formatRelativeTime(getLastUsed(app.client_id))}</div>
           </div>
         </div>
-      \`).join('');
+      `).join('');
       
       document.getElementById('recentActivity').innerHTML = activityHtml || '<div class="p-3 text-center text-muted small">No recent activity</div>';
     }
@@ -651,8 +683,8 @@
 
     function exportApps() {
       const csvContent = "data:text/csv;charset=utf-8," + 
-        "Name,Type,Description,Created\\n" +
-        allApps.map(app => \`"\${app.name}","\${app.app_type}","\${app.description || ''}","\${app.created_at}"\`).join("\\n");
+        "Name,Type,Description,Created\n" +
+        allApps.map(app => `"${app.name}","${app.app_type}","${app.description || ''}","${app.created_at}"`).join("\n");
       
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
@@ -673,11 +705,15 @@
         'zoom': 'bi-camera-video',
         'salesforce': 'bi-cloud',
         'jira': 'bi-bug',
-        'confluence': 'bi-file-text'
+        'confluence': 'bi-file-text',
+        'storage': 'bi-cloud-arrow-up',
+        'drive': 'bi-folder',
+        'mail': 'bi-envelope',
+        'calendar': 'bi-calendar'
       };
       
       const iconClass = Object.keys(icons).find(key => name.toLowerCase().includes(key));
-      return iconClass ? \`<i class="bi \${icons[iconClass]}"></i>\` : \`<i class="bi bi-app"></i>\`;
+      return iconClass ? `<i class="bi ${icons[iconClass]}"></i>` : `<i class="bi bi-app"></i>`;
     }
 
     function getTypeBadgeColor(type) {
@@ -700,9 +736,9 @@
       const diff = now - timestamp;
       
       if (diff < 60000) return 'Just now';
-      if (diff < 3600000) return \`\${Math.floor(diff / 60000)}m ago\`;
-      if (diff < 86400000) return \`\${Math.floor(diff / 3600000)}h ago\`;
-      return \`\${Math.floor(diff / 86400000)}d ago\`;
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+      return `${Math.floor(diff / 86400000)}d ago`;
     }
 
     function debounce(func, wait) {
@@ -739,17 +775,16 @@
     }
 
     function showError(message) {
-      const alertHtml = \`
+      const alertHtml = `
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-          <i class="bi bi-exclamation-circle me-2"></i>\${message}
+          <i class="bi bi-exclamation-circle me-2"></i>${message}
           <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-      \`;
+      `;
       document.querySelector('.container').insertAdjacentHTML('afterbegin', alertHtml);
     }
 
-    // Initialize with filtered apps
-    filteredApps = allApps;
+    // Initialize with all apps
     filterApps();
   </script>
 </body>
