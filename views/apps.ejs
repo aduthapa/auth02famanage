@@ -1,591 +1,374 @@
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    let allApps = [];
-    let filteredApps = [];
-    let favorites = JSON.parse(localStorage.getItem('favoriteApps') || '[]');
-    let currentFilter = 'all';
+<!-- views/apps.ejs - Enhanced with One-Click SSO -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Apps | Account Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .account-header {
+      background: linear-gradient(135deg, #2196f3 0%, #21cbf3 100%);
+      color: white;
+      padding: 2rem 0;
+    }
+    .nav-pills .nav-link {
+      border-radius: 50px;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .nav-pills .nav-link.active {
+      background-color: #667eea;
+    }
+    .card {
+      border: none;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 1.5rem;
+      transition: all 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+    .app-card {
+      border-radius: 15px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+      border: 2px solid #e9ecef;
+    }
+    .app-card:hover {
+      border-color: #2196f3;
+      background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
+      transform: translateY(-5px);
+    }
+    .app-card.launching {
+      border-color: #28a745;
+      background: linear-gradient(135deg, #f0fff4 0%, #d4edda 100%);
+      opacity: 0.8;
+    }
+    .app-card.favorite {
+      border-color: #ffc107;
+      background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+    }
+    .app-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #2196f3, #21cbf3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+      transition: transform 0.3s ease;
+    }
+    .app-card:hover .app-icon {
+      transform: scale(1.1);
+    }
+    .app-card.launching .app-icon {
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .app-type-badge {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 20px;
+    }
+    .favorite-btn {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      color: #ffc107;
+      opacity: 0.5;
+      transition: opacity 0.3s ease;
+    }
+    .favorite-btn.active {
+      opacity: 1;
+    }
+    .favorite-btn:hover {
+      opacity: 1;
+    }
+    .sso-indicator {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      color: white;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+    }
+    .sso-ready { background: #28a745; }
+    .sso-saml { background: #2196f3; }
+    .sso-oauth { background: #28a745; }
+    .sso-integration { background: #ff9800; }
+    .sso-api { background: #9c27b0; }
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+    .loading-skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+      border-radius: 8px;
+    }
+    @keyframes loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .sso-status {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1050;
+      background: rgba(40, 167, 69, 0.9);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      backdrop-filter: blur(5px);
+    }
+    .launch-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 50px;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      color: #28a745;
+      border: 2px solid #28a745;
+      font-weight: bold;
+    }
+    .search-box {
+      position: relative;
+    }
+    .search-box i {
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #6c757d;
+    }
+    .filter-tabs {
+      margin-bottom: 2rem;
+    }
+    .filter-tabs .nav-tabs {
+      border-bottom: 2px solid #e9ecef;
+    }
+    .filter-tabs .nav-link {
+      border: none;
+      color: #6c757d;
+      font-weight: 500;
+      padding: 0.75rem 1rem;
+      border-radius: 0;
+      border-bottom: 2px solid transparent;
+    }
+    .filter-tabs .nav-link.active {
+      background: none;
+      color: #2196f3;
+      border-bottom-color: #2196f3;
+    }
+  </style>
+</head>
+<body>
+  <!-- SSO Status Indicator -->
+  <div class="sso-status" id="ssoStatus">
+    <i class="bi bi-shield-check me-1"></i>SSO Ready
+  </div>
 
-    // Enhanced SSO Manager with better error handling
-    const enhancedSSO = {
-      config: null,
-      ssoToken: null,
-      sessionChecked: false,
-      
-      init(config, ssoToken) {
-        this.config = config;
-        this.ssoToken = ssoToken;
-        this.setupSessionMonitoring();
-        console.log('Enhanced SSO initialized with token:', ssoToken ? 'Present' : 'Missing');
-      },
-      
-      setupSessionMonitoring() {
-        // Check SSO session status every 5 minutes
-        setInterval(() => this.checkSSOSession(), 5 * 60 * 1000);
-        
-        // Listen for storage events (session sharing between tabs)
-        window.addEventListener('storage', (e) => {
-          if (e.key === 'sso_session' && e.newValue) {
-            this.handleSessionUpdate(JSON.parse(e.newValue));
-          }
-        });
-        
-        // Store current session info
-        localStorage.setItem('sso_session', JSON.stringify({
-          token: this.ssoToken,
-          timestamp: Date.now(),
-          authenticated: true
-        }));
-        
-        // Initial session check
-        this.checkSSOSession();
-      },
-      
-      async checkSSOSession() {
-        try {
-          const response = await fetch('/api/sso/check');
-          const sessionData = await response.json();
-          
-          if (sessionData.authenticated) {
-            this.ssoToken = sessionData.session_token;
-            localStorage.setItem('sso_session', JSON.stringify({
-              token: this.ssoToken,
-              timestamp: Date.now(),
-              authenticated: true
-            }));
-            this.updateSSOMStatus(true);
-          } else {
-            this.updateSSOMStatus(false);
-          }
-        } catch (error) {
-          console.warn('SSO session check failed:', error);
-          this.updateSSOMStatus(false);
-        }
-      },
-      
-      updateSSOMStatus(isActive) {
-        const statusEl = document.getElementById('ssoStatus');
-        const checkEl = document.getElementById('ssoCheck');
-        const spinnerEl = document.getElementById('ssoSpinner');
-        
-        if (isActive) {
-          statusEl.innerHTML = '<i class="bi bi-shield-check me-1"></i>SSO Ready';
-          statusEl.className = 'sso-status';
-          statusEl.style.background = 'rgba(40, 167, 69, 0.9)';
-          if (checkEl) checkEl.style.display = 'inline';
-          if (spinnerEl) spinnerEl.style.display = 'none';
-        } else {
-          statusEl.innerHTML = '<i class="bi bi-shield-x me-1"></i>SSO Inactive';
-          statusEl.style.background = 'rgba(220, 53, 69, 0.9)';
-          if (checkEl) checkEl.style.display = 'none';
-          if (spinnerEl) spinnerEl.style.display = 'inline-block';
-        }
-      },
-      
-      handleSessionUpdate(sessionData) {
-        if (sessionData.authenticated && sessionData.token) {
-          this.ssoToken = sessionData.token;
-        }
-      },
-      
-      async launchApplicationWithSSO(clientId) {
-        console.log('🚀 Launching application with enhanced SSO:', clientId);
-        
-        const app = allApps.find(a => a.client_id === clientId);
-        const appName = app ? app.name : 'Application';
-        
-        // Record app launch
-        recordAppLaunch(clientId);
-        
-        // Show launching state
-        this.setAppLaunchingState(clientId, true);
-        this.showLaunchingToast(appName);
-        
-        try {
-          // Get optimized SSO URL from backend
-          const response = await fetch(`/api/applications/${clientId}/sso-launch`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          const data = await response.json();
-          
-          if (data.success) {
-            console.log('✅ Got SSO URL:', data.sso_url);
-            console.log('🔐 Authentication method:', data.auth_method);
-            
-            // Launch the application
-            window.open(data.sso_url, '_blank');
-            
-            // Show appropriate success message
-            if (data.auth_method === 'interactive') {
-              this.showSuccessToast(appName, 'Interactive Login');
-            } else if (data.auth_method === 'saml') {
-              this.showSuccessToast(appName, 'SAML SSO');
-            } else {
-              this.showSuccessToast(appName, 'Silent SSO');
-            }
-          } else {
-            throw new Error(data.error || 'Failed to generate SSO URL');
-          }
-        } catch (error) {
-          console.error('❌ SSO launch failed:', error);
-          this.fallbackLaunch(clientId);
-          this.showInfoToast(appName, 'Using fallback login');
-        } finally {
-          // Reset launching state after 2 seconds
-          setTimeout(() => this.setAppLaunchingState(clientId, false), 2000);
-        }
-      },
-      
-      setAppLaunchingState(clientId, isLaunching) {
-        const appCard = document.querySelector(`[data-app-id="${clientId}"]`);
-        if (appCard) {
-          if (isLaunching) {
-            appCard.classList.add('launching');
-            const indicator = document.createElement('div');
-            indicator.className = 'launch-indicator';
-            indicator.innerHTML = '<i class="bi bi-rocket-takeoff me-1"></i>Launching...';
-            appCard.appendChild(indicator);
-          } else {
-            appCard.classList.remove('launching');
-            const indicator = appCard.querySelector('.launch-indicator');
-            if (indicator) indicator.remove();
-          }
-        }
-      },
-      
-      fallbackLaunch(clientId) {
-        console.log('🔄 Using fallback launch for:', clientId);
-        const app = allApps.find(a => a.client_id === clientId);
-        if (app && app.login_url) {
-          window.open(app.login_url, '_blank');
-        } else {
-          const baseUrl = `https://${this.config.customDomain}`;
-          const ssoUrl = `${baseUrl}/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(this.config.baseUrl + '/apps')}&scope=openid profile email&prompt=login`;
-          window.open(ssoUrl, '_blank');
-        }
-      },
-      
-      showLaunchingToast(appName) {
-        this.showToast('launching', `Launching ${appName}`, 'Connecting with single sign-on...', 'text-primary');
-      },
-      
-      showSuccessToast(appName, method) {
-        this.showToast('success', `✅ ${appName} Launched`, `Opened with ${method}`, 'text-success');
-      },
-      
-      showInfoToast(appName, message) {
-        this.showToast('info', `🔐 ${appName}`, message, 'text-info');
-      },
-      
-      showToast(id, title, message, textClass) {
-        const toastHtml = `
-          <div class="toast-container position-fixed top-0 end-0 p-3">
-            <div id="${id}Toast" class="toast" role="alert" data-bs-autohide="true" data-bs-delay="3000">
-              <div class="toast-header">
-                <div class="spinner-border spinner-border-sm ${textClass} me-2" role="status" style="display: ${id === 'launching' ? 'inline-block' : 'none'};"></div>
-                <strong class="me-auto ${textClass}">${title}</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-              </div>
-              <div class="toast-body">
-                ${message}
+  <!-- Pass server configuration to client-side JavaScript -->
+  <script>
+    window.AUTH0_CONFIG = {
+      customDomain: '<%= auth0Config.customDomain %>',
+      tenantDomain: '<%= auth0Config.tenantDomain %>',
+      baseUrl: '<%= auth0Config.baseUrl %>',
+      clientId: '<%= auth0Config.clientId %>'
+    };
+    window.SSO_TOKEN = '<%= ssoToken %>';
+  </script>
+
+  <!-- Header -->
+  <div class="account-header">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-md-12 text-center">
+          <h1><i class="bi bi-grid-3x3-gap me-2"></i>My Apps</h1>
+          <p class="mb-0">One-click access to all your applications</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container mt-4">
+    <!-- Alert Messages -->
+    <% if (typeof success !== 'undefined' && success) { %>
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i><%= success %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i><%= error %>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    <% } %>
+
+    <!-- Navigation Pills -->
+    <ul class="nav nav-pills justify-content-center mb-4">
+      <li class="nav-item">
+        <a class="nav-link" href="/account">
+          <i class="bi bi-house-door me-2"></i>Overview
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/profile">
+          <i class="bi bi-person me-2"></i>Profile
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/security">
+          <i class="bi bi-shield-check me-2"></i>Security
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/change-password">
+          <i class="bi bi-key me-2"></i>Password
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link active" href="/apps">
+          <i class="bi bi-grid-3x3-gap me-2"></i>Apps
+        </a>
+      </li>
+    </ul>
+
+    <!-- Enhanced SSO Banner -->
+    <div class="alert alert-info mb-4">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h6 class="mb-1"><i class="bi bi-shield-check me-2"></i>Enhanced Single Sign-On Active</h6>
+          <small class="text-muted">Click any application for instant one-click access. No additional logins required.</small>
+        </div>
+        <div class="col-md-4 text-end">
+          <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Ready</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="row mb-4">
+      <div class="col-lg-8">
+        <div class="search-box">
+          <input type="text" class="form-control form-control-lg" placeholder="Search applications..." id="searchInput">
+          <i class="bi bi-search"></i>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <select class="form-select form-select-lg" id="sortSelect">
+          <option value="name">Sort by Name</option>
+          <option value="recent">Recently Used</option>
+          <option value="favorites">Favorites First</option>
+          <option value="type">By Type</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="filter-tabs">
+      <ul class="nav nav-tabs" id="filterTabs">
+        <li class="nav-item">
+          <a class="nav-link active" data-filter="all" href="#">
+            <i class="bi bi-grid me-1"></i>All Apps (<span id="allCount">0</span>)
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-filter="favorites" href="#">
+            <i class="bi bi-star me-1"></i>Favorites (<span id="favCount">0</span>)
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-filter="saml" href="#">
+            <i class="bi bi-shield-lock me-1"></i>SAML (<span id="samlCount">0</span>)
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-filter="oauth" href="#">
+            <i class="bi bi-key me-1"></i>OAuth (<span id="oauthCount">0</span>)
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-filter="recent" href="#">
+            <i class="bi bi-clock me-1"></i>Recent (<span id="recentCount">0</span>)
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="row">
+      <!-- Main Apps Grid -->
+      <div class="col-lg-9">
+        <!-- Loading State -->
+        <div id="loadingState" class="app-grid">
+          <% for(let i = 0; i < 6; i++) { %>
+            <div class="card">
+              <div class="card-body">
+                <div class="loading-skeleton" style="height: 60px; width: 60px; margin-bottom: 1rem;"></div>
+                <div class="loading-skeleton" style="height: 20px; margin-bottom: 0.5rem;"></div>
+                <div class="loading-skeleton" style="height: 16px; width: 70%;"></div>
               </div>
             </div>
-          </div>
-        `;
-        
-        // Remove existing toast
-        const existingToast = document.getElementById(id + 'Toast');
-        if (existingToast) {
-          existingToast.parentElement.remove();
-        }
-        
-        document.body.insertAdjacentHTML('beforeend', toastHtml);
-        const toast = new bootstrap.Toast(document.getElementById(id + 'Toast'));
-        toast.show();
-      }
-    };
-
-    // Initialize page
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('🎯 Apps page loaded, initializing enhanced SSO...');
-      
-      // Initialize enhanced SSO
-      enhancedSSO.init(window.AUTH0_CONFIG, window.SSO_TOKEN);
-      
-      // Load applications
-      loadApplications();
-      setupEventListeners();
-    });
-
-    function setupEventListeners() {
-      document.getElementById('searchInput').addEventListener('input', debounce(filterApps, 300));
-      document.getElementById('sortSelect').addEventListener('change', sortApps);
-      
-      document.querySelectorAll('[data-filter]').forEach(tab => {
-        tab.addEventListener('click', function(e) {
-          e.preventDefault();
-          setActiveFilter(this.dataset.filter);
-        });
-      });
-    }
-
-    // Enhanced launch function
-    function launchApp(clientId, loginUrl) {
-      enhancedSSO.launchApplicationWithSSO(clientId);
-    }
-
-    // Test SSO function
-    async function testSSO() {
-      const spinnerEl = document.getElementById('ssoSpinner');
-      const checkEl = document.getElementById('ssoCheck');
-      
-      if (spinnerEl) spinnerEl.style.display = 'inline-block';
-      if (checkEl) checkEl.style.display = 'none';
-      
-      await enhancedSSO.checkSSOSession();
-      
-      setTimeout(() => {
-        if (spinnerEl) spinnerEl.style.display = 'none';
-        if (checkEl) checkEl.style.display = 'inline';
-      }, 1000);
-    }
-
-    // Refresh SSO function
-    async function refreshSSO() {
-      try {
-        const response = await fetch('/api/sso/refresh', { method: 'POST' });
-        const data = await response.json();
-        
-        if (data.success) {
-          enhancedSSO.ssoToken = data.session_token;
-          enhancedSSO.showSuccessToast('SSO Session', 'Refreshed successfully');
-        }
-      } catch (error) {
-        console.error('Failed to refresh SSO:', error);
-      }
-    }
-
-    function loadApplications() {
-      console.log('📱 Fetching applications from /api/applications...');
-      
-      document.getElementById('loadingState').style.display = 'block';
-      document.getElementById('appsGrid').style.display = 'none';
-      
-      fetch('/api/applications')
-        .then(response => {
-          console.log('📡 Applications API response status:', response.status);
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          console.log('📊 Applications API response:', data);
-          if (data.success) {
-            allApps = data.applications || [];
-            console.log(`📋 Loaded ${allApps.length} applications:`, allApps.map(app => ({ name: app.name, type: app.app_type })));
-            filteredApps = [...allApps];
-            updateStats();
-            renderApps();
-            loadRecentActivity();
-          } else {
-            throw new Error(data.error || 'Failed to load applications');
-          }
-        })
-        .catch(error => {
-          console.error('❌ Error loading applications:', error);
-          showError('Failed to load applications: ' + error.message);
-        })
-        .finally(() => {
-          document.getElementById('loadingState').style.display = 'none';
-          document.getElementById('appsGrid').style.display = 'grid';
-        });
-    }
-
-    function renderApps() {
-      console.log(`🎨 Rendering ${filteredApps.length} applications`);
-      const grid = document.getElementById('appsGrid');
-      const noAppsMessage = document.getElementById('noAppsMessage');
-      
-      if (filteredApps.length === 0) {
-        grid.style.display = 'none';
-        noAppsMessage.style.display = 'block';
-        return;
-      }
-      
-      grid.style.display = 'grid';
-      noAppsMessage.style.display = 'none';
-      
-      grid.innerHTML = filteredApps.map(app => `
-        <div class="app-card ${favorites.includes(app.client_id) ? 'favorite' : ''}" 
-             onclick="launchApp('${app.client_id}', '${app.login_url || ''}')"
-             data-app-id="${app.client_id}">
-          
-          <button class="favorite-btn ${favorites.includes(app.client_id) ? 'active' : ''}" 
-                  onclick="event.stopPropagation(); toggleFavorite('${app.client_id}')"
-                  title="Add to favorites">
-            <i class="bi bi-star${favorites.includes(app.client_id) ? '-fill' : ''}"></i>
-          </button>
-          
-          <span class="app-type-badge badge bg-${getTypeBadgeColor(app.app_type)}">
-            ${app.app_type || 'Unknown'}
-          </span>
-          
-          <div class="app-icon">
-            ${app.logo_uri ? `<img src="${app.logo_uri}" alt="${app.name}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px;">` : getAppIcon(app.name)}
-          </div>
-          
-          <h6 class="fw-bold mb-1">${app.name}</h6>
-          <p class="text-muted small mb-0">${app.description || 'One-click SSO access'}</p>
-          
-          <div class="app-stats">
-            <small><i class="bi bi-calendar me-1"></i>Added ${formatDate(app.created_at)}</small>
-            ${getSSOModeIcon(app.app_type)}
-          </div>
+          <% } %>
         </div>
-      `).join('');
-    }
 
-    function getSSOModeIcon(appType) {
-      switch(appType) {
-        case 'sso_integration':
-          return '<div class="sso-indicator sso-integration" title="SSO Integration"><i class="bi bi-link-45deg"></i></div>';
-        case 'samlp':
-          return '<div class="sso-indicator sso-saml" title="SAML SSO"><i class="bi bi-shield-check"></i></div>';
-        case 'regular_web':
-        case 'spa':
-          return '<div class="sso-indicator sso-oauth" title="OAuth SSO"><i class="bi bi-check"></i></div>';
-        case 'non_interactive':
-          return '<div class="sso-indicator sso-api" title="API Access"><i class="bi bi-gear"></i></div>';
-        default:
-          return '<div class="sso-indicator sso-ready" title="SSO Ready"><i class="bi bi-check"></i></div>';
-      }
-    }
-
-    function toggleFavorite(clientId) {
-      const index = favorites.indexOf(clientId);
-      if (index > -1) {
-        favorites.splice(index, 1);
-      } else {
-        favorites.push(clientId);
-      }
-      
-      localStorage.setItem('favoriteApps', JSON.stringify(favorites));
-      updateStats();
-      renderApps();
-      updateFilterCounts();
-    }
-
-    function filterApps() {
-      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-      
-      filteredApps = allApps.filter(app => {
-        const matchesSearch = !searchTerm || 
-          app.name.toLowerCase().includes(searchTerm) ||
-          (app.description && app.description.toLowerCase().includes(searchTerm));
-        
-        const matchesFilter = 
-          currentFilter === 'all' ||
-          (currentFilter === 'favorites' && favorites.includes(app.client_id)) ||
-          (currentFilter === 'saml' && app.app_type === 'samlp') ||
-          (currentFilter === 'oauth' && (app.app_type === 'spa' || app.app_type === 'regular_web')) ||
-          (currentFilter === 'recent' && isRecentlyUsed(app.client_id));
-        
-        return matchesSearch && matchesFilter;
-      });
-      
-      console.log(`🔍 Filtered to ${filteredApps.length} applications`);
-      renderApps();
-    }
-
-    function setActiveFilter(filter) {
-      currentFilter = filter;
-      
-      document.querySelectorAll('[data-filter]').forEach(tab => {
-        tab.classList.remove('active');
-      });
-      document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
-      
-      filterApps();
-    }
-
-    function sortApps() {
-      const sortBy = document.getElementById('sortSelect').value;
-      
-      filteredApps.sort((a, b) => {
-        switch(sortBy) {
-          case 'name':
-            return a.name.localeCompare(b.name);
-          case 'recent':
-            return getLastUsed(b.client_id) - getLastUsed(a.client_id);
-          case 'favorites':
-            const aFav = favorites.includes(a.client_id);
-            const bFav = favorites.includes(b.client_id);
-            if (aFav && !bFav) return -1;
-            if (!aFav && bFav) return 1;
-            return a.name.localeCompare(b.name);
-          case 'type':
-            return (a.app_type || 'z').localeCompare(b.app_type || 'z');
-          default:
-            return 0;
-        }
-      });
-      
-      renderApps();
-    }
-
-    function updateStats() {
-      document.getElementById('totalApps').textContent = allApps.length;
-      document.getElementById('favoriteApps').textContent = favorites.length;
-      document.getElementById('ssoEnabled').textContent = allApps.filter(app => !app.sso_disabled).length;
-      document.getElementById('recentLogins').textContent = getRecentlyUsedApps().length;
-      
-      updateFilterCounts();
-    }
-
-    function updateFilterCounts() {
-      document.getElementById('allCount').textContent = allApps.length;
-      document.getElementById('favCount').textContent = favorites.length;
-      document.getElementById('samlCount').textContent = allApps.filter(app => app.app_type === 'samlp').length;
-      document.getElementById('oauthCount').textContent = allApps.filter(app => app.app_type === 'spa' || app.app_type === 'regular_web').length;
-      document.getElementById('recentCount').textContent = getRecentlyUsedApps().length;
-    }
-
-    function loadRecentActivity() {
-      const recentApps = getRecentlyUsedApps().slice(0, 5);
-      const activityHtml = recentApps.map(app => `
-        <div class="activity-item" style="display: flex; align-items: center; padding: 0.5rem; border-bottom: 1px solid #e9ecef;">
-          <div style="width: 32px; height: 32px; border-radius: 50%; background: #e3f2fd; display: flex; align-items: center; justify-content: center; margin-right: 1rem; color: #2196f3;">
-            <i class="bi bi-box-arrow-up-right"></i>
-          </div>
-          <div style="flex-grow: 1;">
-            <div class="fw-bold small">${app.name}</div>
-            <div class="text-muted small">${formatRelativeTime(getLastUsed(app.client_id))}</div>
-          </div>
+        <!-- Apps Grid -->
+        <div id="appsGrid" class="app-grid" style="display: none;">
+          <!-- Apps will be populated by JavaScript -->
         </div>
-      `).join('');
-      
-      document.getElementById('recentActivity').innerHTML = activityHtml || '<div class="p-3 text-center text-muted small">No recent activity</div>';
-    }
 
-    function refreshApps() {
-      loadApplications();
-    }
-
-    function exportApps() {
-      const csvContent = "data:text/csv;charset=utf-8," + 
-        "Name,Type,Description,Created\n" +
-        allApps.map(app => `"${app.name}","${app.app_type}","${app.description || ''}","${app.created_at}"`).join("\n");
-      
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "applications.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    // Utility functions
-    function getAppIcon(name) {
-      const icons = {
-        'slack': 'bi-slack',
-        'github': 'bi-github',
-        'google': 'bi-google',
-        'microsoft': 'bi-microsoft',
-        'zoom': 'bi-camera-video',
-        'salesforce': 'bi-cloud',
-        'jira': 'bi-bug',
-        'confluence': 'bi-file-text',
-        'storage': 'bi-cloud-arrow-up',
-        'drive': 'bi-folder',
-        'mail': 'bi-envelope',
-        'calendar': 'bi-calendar',
-        'wordpress': 'bi-wordpress',
-        'wp': 'bi-wordpress',
-        'admin': 'bi-gear-fill',
-        'workspace': 'bi-briefcase',
-        'office': 'bi-file-earmark-text',
-        'dashboard': 'bi-speedometer2'
-      };
-      
-      const iconClass = Object.keys(icons).find(key => name.toLowerCase().includes(key));
-      return iconClass ? `<i class="bi ${icons[iconClass]}"></i>` : `<i class="bi bi-app"></i>`;
-    }
-
-    function getTypeBadgeColor(type) {
-      const colors = {
-        'samlp': 'primary',
-        'spa': 'success', 
-        'regular_web': 'info',
-        'native': 'warning',
-        'm2m': 'secondary',
-        'sso_integration': 'warning',
-        'non_interactive': 'dark'
-      };
-      return colors[type] || 'secondary';
-    }
-
-    function formatDate(dateString) {
-      return new Date(dateString).toLocaleDateString();
-    }
-
-    function formatRelativeTime(timestamp) {
-      const now = Date.now();
-      const diff = now - timestamp;
-      
-      if (diff < 60000) return 'Just now';
-      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-      return `${Math.floor(diff / 86400000)}d ago`;
-    }
-
-    function debounce(func, wait) {
-      let timeout;
-      return function executedFunction(...args) {
-        const later = () => {
-          clearTimeout(timeout);
-          func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-      };
-    }
-
-    function recordAppLaunch(clientId) {
-      const launches = JSON.parse(localStorage.getItem('appLaunches') || '{}');
-      launches[clientId] = Date.now();
-      localStorage.setItem('appLaunches', JSON.stringify(launches));
-    }
-
-    function getLastUsed(clientId) {
-      const launches = JSON.parse(localStorage.getItem('appLaunches') || '{}');
-      return launches[clientId] || 0;
-    }
-
-    function isRecentlyUsed(clientId) {
-      const lastUsed = getLastUsed(clientId);
-      return lastUsed > (Date.now() - 7 * 24 * 60 * 60 * 1000);
-    }
-
-    function getRecentlyUsedApps() {
-      return allApps.filter(app => isRecentlyUsed(app.client_id))
-                   .sort((a, b) => getLastUsed(b.client_id) - getLastUsed(a.client_id));
-    }
-
-    function showError(message) {
-      const alertHtml = `
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-          <i class="bi bi-exclamation-circle me-2"></i>${message}
-          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <!-- No Apps Message -->
+        <div id="noAppsMessage" class="text-center py-5" style="display: none;">
+          <i class="bi bi-grid-3x3-gap" style="font-size: 4rem; color: #6c757d;"></i>
+          <h4 class="mt-3 text-muted">No Applications Found</h4>
+          <p class="text-muted">No applications match your current filter criteria.</p>
         </div>
-      `;
-      document.querySelector('.container').insertAdjacentHTML('afterbegin', alertHtml);
-    }
+      </div>
 
-    // Initialize filtered apps
-    filterApps();
-  </script>
+      <!-- Sidebar -->
+      <div class="col-lg-3">
+        <!-- Quick Stats -->
+        <div class="card">
+          <div class="card-header">
+            <h6><i class="bi bi-bar-chart me-2"></i>Quick Stats</h6>
+          </div>
+          <div class="card-body">
+            <div class="row text-center">
+              <div class="col-6">
+                <h4 class="text-primary" id="totalApps">-</h4>
+                <small class="text-muted">Total Apps</small>
+              </div>
+              <div class="col-6">
+                <h4 class="text-warning" id="favoriteApps">-
