@@ -559,11 +559,13 @@ app.post('/api/applications/:clientId/sso-launch', requiresAuth(), async (req, r
     const redirectUri = (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
     
     let ssoUrl;
+    let authMethod;
     
     switch(client.app_type) {
       case 'samlp':
         // SAML applications get direct SSO - most reliable
         ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/samlp/${clientId}`;
+        authMethod = 'saml';
         console.log(`Generated SAML SSO URL for ${client.name}`);
         break;
         
@@ -576,19 +578,21 @@ app.post('/api/applications/:clientId/sso-launch', requiresAuth(), async (req, r
           `scope=openid profile email&` +
           `prompt=none&` +
           `state=${encodeURIComponent(JSON.stringify({ sso_token: ssoToken, source: 'portal', timestamp: Date.now() }))}`;
+        authMethod = 'silent';
         console.log(`Generated SSO Integration URL for ${client.name}`);
         break;
         
       default:
-        // Regular web applications with enhanced SSO flow
+        // Regular web applications with interactive login (FIXES the login_required error)
         ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/authorize?` +
           `client_id=${clientId}&` +
           `response_type=code&` +
           `redirect_uri=${encodeURIComponent(redirectUri)}&` +
           `scope=openid profile email&` +
-          `prompt=none&` +
+          `prompt=login&` +
           `state=${encodeURIComponent(JSON.stringify({ sso_token: ssoToken, source: 'portal', timestamp: Date.now() }))}`;
-        console.log(`Generated OAuth SSO URL for ${client.name}`);
+        authMethod = 'interactive';
+        console.log(`Generated OAuth SSO URL for ${client.name} with interactive login`);
     }
 
     res.json({
@@ -597,7 +601,8 @@ app.post('/api/applications/:clientId/sso-launch', requiresAuth(), async (req, r
       client_name: client.name,
       app_type: client.app_type,
       session_token: ssoToken,
-      redirect_uri: redirectUri
+      redirect_uri: redirectUri,
+      auth_method: authMethod
     });
   } catch (error) {
     console.error('Error generating SSO launch URL:', error);
