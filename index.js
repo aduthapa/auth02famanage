@@ -1,3 +1,53 @@
+// Add this simple debug route to test the API - add to your index.js
+
+// Debug API endpoint to test Auth0 connection
+app.get('/api/debug', requiresAuth(), async (req, res) => {
+  try {
+    console.log('Debug API called');
+    
+    // Test 1: Basic response
+    const basicTest = {
+      message: 'API is working',
+      timestamp: new Date().toISOString(),
+      user: req.oidc.user.sub
+    };
+    
+    // Test 2: Try to get clients
+    console.log('Attempting to fetch clients...');
+    const clients = await managementAPI.getClients({
+      fields: 'client_id,name,app_type',
+      include_fields: true
+    });
+    
+    console.log(`Found ${clients.length} clients`);
+    
+    // Test 3: Filter clients
+    const filteredClients = clients.filter(client => 
+      client.client_id !== process.env.AUTH0_CLIENT_ID && 
+      client.client_id !== process.env.AUTH0_MGMT_CLIENT_ID
+    );
+    
+    console.log(`After filtering: ${filteredClients.length} clients`);
+    
+    res.json({
+      success: true,
+      basicTest,
+      totalClients: clients.length,
+      filteredClients: filteredClients.length,
+      sampleClient: filteredClients[0] || null,
+      managementClientId: process.env.AUTH0_MGMT_CLIENT_ID ? 'SET' : 'NOT SET'
+    });
+    
+  } catch (error) {
+    console.error('Debug API Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      statusCode: error.statusCode || 'unknown'
+    });
+  }
+});
+
 // index.js - Complete Enhanced Account Management Portal with Apps
 const express = require('express');
 const session = require('express-session');
