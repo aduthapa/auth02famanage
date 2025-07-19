@@ -477,7 +477,12 @@ app.get('/apps', requiresAuth(), async (req, res) => {
       oidcUser: req.oidc.user,
       currentPage: 'apps',
       success: req.query.success,
-      error: req.query.error
+      error: req.query.error,
+      auth0Config: {
+        customDomain: process.env.AUTH0_CUSTOM_DOMAIN,
+        tenantDomain: process.env.AUTH0_TENANT_DOMAIN,
+        baseUrl: process.env.BASE_URL
+      }
     });
   } catch (error) {
     console.error('Error fetching apps page data:', error);
