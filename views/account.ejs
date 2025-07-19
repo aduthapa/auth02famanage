@@ -91,7 +91,7 @@
     <ul class="nav nav-pills justify-content-center mb-4">
       <li class="nav-item">
         <a class="nav-link active" href="/account">
-          <i class="bi bi-house-door me-2"></i>Overview
+          <i class="bi bi-speedometer2 me-2"></i>Overview
         </a>
       </li>
       <li class="nav-item">
@@ -107,6 +107,12 @@
       <li class="nav-item">
         <a class="nav-link" href="/change-password">
           <i class="bi bi-key me-2"></i>Password
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/apps">
+          <i class="bi bi-grid-3x3-gap me-2"></i>Apps
+          <span class="badge bg-primary rounded-pill ms-1" style="font-size: 0.6rem;">New</span>
         </a>
       </li>
     </ul>
@@ -170,6 +176,36 @@
             <p>Configure two-factor authentication and security options.</p>
             <a href="/security" class="btn btn-success">
               <i class="bi bi-shield-plus me-2"></i>Manage Security
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Apps Quick Action -->
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-grid-3x3-gap me-2"></i>My Applications</h5>
+          </div>
+          <div class="card-body">
+            <p>Single sign-on to all your applications with one click.</p>
+            <a href="/apps" class="btn btn-info">
+              <i class="bi bi-box-arrow-up-right me-2"></i>Launch Apps
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-key me-2"></i>Password Management</h5>
+          </div>
+          <div class="card-body">
+            <p>Update your password securely and manage login credentials.</p>
+            <a href="/change-password" class="btn btn-warning">
+              <i class="bi bi-key me-2"></i>Change Password
             </a>
           </div>
         </div>
