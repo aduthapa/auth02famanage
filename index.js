@@ -1,4 +1,4 @@
-// index.js - Complete Enhanced Account Management Portal
+// index.js - Complete Enhanced Account Management Portal with Apps
 const express = require('express');
 const session = require('express-session');
 const { auth, requiresAuth } = require('express-openid-connect');
@@ -46,7 +46,7 @@ const managementAPI = new ManagementClient({
   clientId: process.env.AUTH0_MGMT_CLIENT_ID,
   clientSecret: process.env.AUTH0_MGMT_CLIENT_SECRET,
   audience: `https://${process.env.AUTH0_TENANT_DOMAIN}/api/v2/`,
-  scope: 'read:users update:users delete:guardian_enrollments create:guardian_enrollment_tickets read:user_idp_tokens create:user_tickets'
+  scope: 'read:users update:users delete:guardian_enrollments create:guardian_enrollment_tickets read:user_idp_tokens create:user_tickets read:clients read:client_grants read:connections'
 });
 
 // Home route
@@ -65,6 +65,7 @@ app.get('/account', requiresAuth(), async (req, res) => {
       user: user,
       oidcUser: req.oidc.user,
       mfaEnrollments: enrollments,
+      currentPage: 'account',
       success: req.query.success,
       error: req.query.error
     });
@@ -83,6 +84,7 @@ app.get('/profile', requiresAuth(), async (req, res) => {
     res.render('profile', { 
       user: user,
       oidcUser: req.oidc.user,
+      currentPage: 'profile',
       success: req.query.success,
       error: req.query.error
     });
@@ -233,6 +235,7 @@ app.get('/change-password', requiresAuth(), async (req, res) => {
     
     res.render('change-password', { 
       user: user,
+      currentPage: 'password',
       success: req.query.success,
       error: req.query.error
     });
@@ -375,6 +378,7 @@ app.get('/security', requiresAuth(), async (req, res) => {
         { id: 'otp', name: 'Authenticator App', icon: '🔑', description: 'Use Google Authenticator or similar apps' },
         { id: 'webauthn-roaming', name: 'Security Key', icon: '🔐', description: 'Use hardware security keys' }
       ],
+      currentPage: 'security',
       success: req.query.success,
       error: req.query.error
     });
@@ -411,6 +415,308 @@ app.post('/delete-mfa/:enrollmentId', requiresAuth(), async (req, res) => {
   } catch (error) {
     console.error('Error deleting MFA enrollment:', error);
     res.redirect('/security?error=Failed to remove MFA method');
+  }
+});
+
+// Apps Portal route
+app.get('/apps', requiresAuth(), async (req, res) => {
+  try {
+    const userId = req.oidc.user.sub;
+    const user = await managementAPI.getUser({ id: userId });
+
+    res.render('apps', { 
+      user: user,
+      oidcUser: req.oidc.user,
+      currentPage: 'apps',
+      success: req.query.success,
+      error: req.query.error
+    });
+  } catch (error) {
+    console.error('Error fetching apps page data:', error);
+    res.status(500).render('error', { message: 'Failed to load apps page' });
+  }
+});
+
+// API endpoint to get all applications in the tenant
+app.get('/api/applications', requiresAuth(), async (req, res) => {
+  try {
+    // Get all clients from Auth0 Management API
+    const clients = await managementAPI.getClients({
+      fields: 'client_id,name,description,app_type,logo_uri,created_at,sso_disabled,callbacks,web_origins,client_metadata',
+      include_fields: true
+    });
+
+    // Filter and format applications
+    const applications = clients
+      .filter(client => {
+        // Exclude the current management app and system apps
+        return client.client_id !== process.env.AUTH0_CLIENT_ID && 
+               client.client_id !== process.env.AUTH0_MGMT_CLIENT_ID &&
+               !client.name.includes('Auth0') &&
+               !client.name.includes('Management') &&
+               client.app_type !== 'm2m'; // Exclude machine-to-machine apps for SSO
+      })
+      .map(client => ({
+        client_id: client.client_id,
+        name: client.name,
+        description: client.description,
+        app_type: client.app_type,
+        logo_uri: client.logo_uri,
+        created_at: client.created_at,
+        sso_disabled: client.sso_disabled || false,
+        login_url: generateLoginUrl(client),
+        callbacks: client.callbacks,
+        web_origins: client.web_origins,
+        metadata: client.client_metadata || {}
+      }));
+
+    res.json({
+      success: true,
+      applications: applications,
+      total: applications.length
+    });
+  } catch (error) {
+    console.error('Error fetching applications:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch applications',
+      message: error.message
+    });
+  }
+});
+
+// API endpoint to launch an application with SSO
+app.post('/api/applications/:clientId/launch', requiresAuth(), async (req, res) => {
+  const { clientId } = req.params;
+  const { returnUrl } = req.body;
+  
+  try {
+    // Get client details
+    const client = await managementAPI.getClient({ client_id: clientId });
+    
+    if (!client) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    // Generate SSO URL
+    const redirectUri = returnUrl || (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
+    const ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}/authorize?` +
+      `client_id=${clientId}&` +
+      `response_type=code&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `scope=openid profile email&` +
+      `state=${encodeURIComponent(JSON.stringify({ source: 'apps_portal', timestamp: Date.now() }))}`;
+
+    res.json({
+      success: true,
+      sso_url: ssoUrl,
+      client_name: client.name,
+      redirect_uri: redirectUri
+    });
+  } catch (error) {
+    console.error('Error launching application:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to launch application',
+      message: error.message
+    });
+  }
+});
+
+// API endpoint to get application usage statistics
+app.get('/api/applications/stats', requiresAuth(), async (req, res) => {
+  try {
+    const userId = req.oidc.user.sub;
+    
+    // Get user's login history (simplified - in production you'd use Auth0 logs API)
+    const clients = await managementAPI.getClients();
+    const userApps = clients.filter(client => 
+      client.client_id !== process.env.AUTH0_CLIENT_ID && 
+      client.client_id !== process.env.AUTH0_MGMT_CLIENT_ID &&
+      !client.name.includes('Auth0')
+    );
+
+    const stats = {
+      total_applications: userApps.length,
+      saml_applications: userApps.filter(app => app.app_type === 'samlp').length,
+      oauth_applications: userApps.filter(app => 
+        app.app_type === 'spa' || 
+        app.app_type === 'regular_web' || 
+        app.app_type === 'native'
+      ).length,
+      sso_enabled: userApps.filter(app => !app.sso_disabled).length,
+      recent_launches: 0, // Would come from logs in production
+      favorite_count: 0   // Would come from user metadata
+    };
+
+    res.json({
+      success: true,
+      stats: stats
+    });
+  } catch (error) {
+    console.error('Error fetching application stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch statistics'
+    });
+  }
+});
+
+// API endpoint to update user's favorite applications
+app.post('/api/applications/favorites', requiresAuth(), async (req, res) => {
+  const { favorites } = req.body;
+  const userId = req.oidc.user.sub;
+
+  try {
+    // Update user metadata with favorite apps
+    await managementAPI.updateUser({ id: userId }, {
+      user_metadata: {
+        ...req.oidc.user.user_metadata,
+        favorite_apps: favorites
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Favorites updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating favorites:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update favorites'
+    });
+  }
+});
+
+// API endpoint to search applications
+app.get('/api/applications/search', requiresAuth(), async (req, res) => {
+  const { q, type, limit = 20 } = req.query;
+
+  try {
+    let clients = await managementAPI.getClients({
+      fields: 'client_id,name,description,app_type,logo_uri',
+      include_fields: true
+    });
+
+    // Filter out system applications
+    clients = clients.filter(client => 
+      client.client_id !== process.env.AUTH0_CLIENT_ID && 
+      client.client_id !== process.env.AUTH0_MGMT_CLIENT_ID &&
+      !client.name.includes('Auth0') &&
+      client.app_type !== 'm2m'
+    );
+
+    // Apply search filter
+    if (q) {
+      const searchTerm = q.toLowerCase();
+      clients = clients.filter(client => 
+        client.name.toLowerCase().includes(searchTerm) ||
+        (client.description && client.description.toLowerCase().includes(searchTerm))
+      );
+    }
+
+    // Apply type filter
+    if (type && type !== 'all') {
+      clients = clients.filter(client => {
+        switch(type) {
+          case 'saml': return client.app_type === 'samlp';
+          case 'oauth': return ['spa', 'regular_web', 'native'].includes(client.app_type);
+          default: return client.app_type === type;
+        }
+      });
+    }
+
+    // Limit results
+    clients = clients.slice(0, parseInt(limit));
+
+    res.json({
+      success: true,
+      applications: clients.map(client => ({
+        client_id: client.client_id,
+        name: client.name,
+        description: client.description,
+        app_type: client.app_type,
+        logo_uri: client.logo_uri,
+        login_url: generateLoginUrl(client)
+      })),
+      total: clients.length
+    });
+  } catch (error) {
+    console.error('Error searching applications:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Search failed'
+    });
+  }
+});
+
+// Helper function to generate login URL for different app types
+function generateLoginUrl(client) {
+  const baseUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}`;
+  
+  switch(client.app_type) {
+    case 'samlp':
+      // SAML SSO URL
+      return `${baseUrl}/samlp/${client.client_id}`;
+    
+    case 'spa':
+    case 'regular_web':
+    case 'native':
+      // OAuth/OIDC SSO URL
+      const redirectUri = (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
+      return `${baseUrl}/authorize?` +
+        `client_id=${client.client_id}&` +
+        `response_type=code&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `scope=openid profile email`;
+    
+    default:
+      return null;
+  }
+}
+
+// API endpoint to get application details
+app.get('/api/applications/:clientId', requiresAuth(), async (req, res) => {
+  const { clientId } = req.params;
+
+  try {
+    const client = await managementAPI.getClient({ client_id: clientId });
+    
+    if (!client) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    // Enhanced application details
+    const applicationDetails = {
+      client_id: client.client_id,
+      name: client.name,
+      description: client.description,
+      app_type: client.app_type,
+      logo_uri: client.logo_uri,
+      created_at: client.created_at,
+      updated_at: client.updated_at,
+      sso_disabled: client.sso_disabled || false,
+      callbacks: client.callbacks || [],
+      web_origins: client.web_origins || [],
+      allowed_origins: client.allowed_origins || [],
+      login_url: generateLoginUrl(client),
+      metadata: client.client_metadata || {},
+      grant_types: client.grant_types || [],
+      jwt_configuration: client.jwt_configuration || {},
+      encryption_key: client.encryption_key || null
+    };
+
+    res.json({
+      success: true,
+      application: applicationDetails
+    });
+  } catch (error) {
+    console.error('Error fetching application details:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch application details'
+    });
   }
 });
 
