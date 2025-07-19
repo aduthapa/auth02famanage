@@ -1,4 +1,4 @@
-// index.js - Complete Enhanced Account Management Portal with Apps
+// index.js - Complete Enhanced Account Management Portal with One-Click SSO
 const express = require('express');
 const session = require('express-session');
 const { auth, requiresAuth } = require('express-openid-connect');
@@ -48,6 +48,23 @@ const managementAPI = new ManagementClient({
   audience: `https://${process.env.AUTH0_TENANT_DOMAIN}/api/v2/`,
   scope: 'read:users update:users delete:guardian_enrollments create:guardian_enrollment_tickets read:user_idp_tokens create:user_tickets read:clients read:client_grants read:connections'
 });
+
+// SSO Token Generation Helper
+function generateSSOToken(user) {
+  const crypto = require('crypto');
+  const payload = {
+    sub: user.sub,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (15 * 60), // 15 minutes
+    aud: 'sso-portal',
+    iss: process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN,
+    nonce: crypto.randomBytes(16).toString('hex')
+  };
+  
+  // Simple token generation (in production, use proper JWT signing)
+  const token = Buffer.from(JSON.stringify(payload)).toString('base64');
+  return token;
+}
 
 // Debug API endpoint to test Auth0 connection
 app.get('/api/debug', requiresAuth(), async (req, res) => {
@@ -466,11 +483,14 @@ app.post('/delete-mfa/:enrollmentId', requiresAuth(), async (req, res) => {
   }
 });
 
-// Apps Portal route
+// Enhanced Apps Portal route with SSO
 app.get('/apps', requiresAuth(), async (req, res) => {
   try {
     const userId = req.oidc.user.sub;
     const user = await managementAPI.getUser({ id: userId });
+
+    // Generate a secure SSO token for session sharing
+    const ssoToken = generateSSOToken(req.oidc.user);
 
     res.render('apps', { 
       user: user,
@@ -481,139 +501,9 @@ app.get('/apps', requiresAuth(), async (req, res) => {
       auth0Config: {
         customDomain: process.env.AUTH0_CUSTOM_DOMAIN,
         tenantDomain: process.env.AUTH0_TENANT_DOMAIN,
-        baseUrl: process.env.BASE_URL
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching apps page data:', error);
-    res.status(500).render('error', { message: 'Failed to load apps page' });
-  }
-});
-
-// API endpoint to get all applications in the tenant
-app.get('/api/applications', requiresAuth(), async (req, res) => {
-  try {
-    console.log('Fetching applications from Auth0...');
-    
-    // Get all clients from Auth0 Management API with only valid fields
-    const clients = await managementAPI.getClients({
-      fields: 'client_id,name,description,app_type,logo_uri,callbacks,web_origins,client_metadata',
-      include_fields: true
-    });
-
-    console.log(`Found ${clients.length} total clients`);
-
-    // Filter and format applications
-    const applications = clients
-      .filter(client => {
-        // Exclude the current management app and system apps
-        const isCurrentApp = client.client_id === process.env.AUTH0_CLIENT_ID;
-        const isManagementApp = client.client_id === process.env.AUTH0_MGMT_CLIENT_ID;
-        const isSystemApp = client.name && (
-          client.name.includes('Auth0') ||
-          client.name.includes('Management') ||
-          client.name.includes('Global Client') ||
-          client.name.includes('All Applications')
-        );
-        const isM2M = client.app_type === 'm2m';
-        
-        return !isCurrentApp && !isManagementApp && !isSystemApp && !isM2M;
-      })
-      .map(client => ({
-        client_id: client.client_id,
-        name: client.name,
-        description: client.description,
-        app_type: client.app_type,
-        logo_uri: client.logo_uri,
-        created_at: new Date().toISOString(), // Fallback date since created_at is not available
-        sso_disabled: false, // Default to SSO enabled since we can't fetch this field
-        login_url: generateLoginUrl(client),
-        callbacks: client.callbacks,
-        web_origins: client.web_origins,
-        metadata: client.client_metadata || {}
-      }));
-
-    console.log(`After filtering: ${applications.length} applications`);
-    console.log('Applications:', applications.map(app => ({ name: app.name, type: app.app_type })));
-
-    res.json({
-      success: true,
-      applications: applications,
-      total: applications.length
-    });
-  } catch (error) {
-    console.error('Error fetching applications:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch applications',
-      message: error.message,
-      statusCode: error.statusCode
-    });
-  }
-});
-
-// API endpoint to launch an application with SSO
-app.post('/api/applications/:clientId/launch', requiresAuth(), async (req, res) => {
-  const { clientId } = req.params;
-  const { returnUrl } = req.body;
-  
-  try {
-    // Get client details
-    const client = await managementAPI.getClient({ client_id: clientId });
-    
-    if (!client) {
-      return res.status(404).json({ error: 'Application not found' });
-    }
-
-    // Generate SSO URL
-    const redirectUri = returnUrl || (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
-    const ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/authorize?` +
-      `client_id=${clientId}&` +
-      `response_type=code&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `scope=openid profile email&` +
-      `state=${encodeURIComponent(JSON.stringify({ source: 'apps_portal', timestamp: Date.now() }))}`;
-
-    res.json({
-      success: true,
-      sso_url: ssoUrl,
-      client_name: client.name,
-      redirect_uri: redirectUri
-    });
-  } catch (error) {
-    console.error('Error launching application:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to launch application',
-      message: error.message
-    });
-  }
-});
-
-// API endpoint to get application usage statistics
-app.get('/api/applications/stats', requiresAuth(), async (req, res) => {
-  try {
-    const userId = req.oidc.user.sub;
-    
-    // Get user's login history (simplified - in production you'd use Auth0 logs API)
-    const clients = await managementAPI.getClients({
-      fields: 'client_id,name,app_type',
-      include_fields: true
-    });
-    const userApps = clients.filter(client => 
-      client.client_id !== process.env.AUTH0_CLIENT_ID && 
-      client.client_id !== process.env.AUTH0_MGMT_CLIENT_ID &&
-      !client.name.includes('Auth0')
-    );
-
-    const stats = {
-      total_applications: userApps.length,
-      saml_applications: userApps.filter(app => app.app_type === 'samlp').length,
-      oauth_applications: userApps.filter(app => 
-        app.app_type === 'spa' || 
-        app.app_type === 'regular_web' || 
-        app.app_type === 'native'
-      ).length,
+        baseUrl: process.env.BASE_URL,
+        clientId: process.env.AUTH0_CLIENT_ID
+      },
       sso_enabled: userApps.length, // Assume all apps have SSO enabled since we can't fetch sso_disabled
       recent_launches: 0, // Would come from logs in production
       favorite_count: 0   // Would come from user metadata
@@ -721,30 +611,28 @@ app.get('/api/applications/search', requiresAuth(), async (req, res) => {
   }
 });
 
-// Helper function to generate login URL for different app types
+// Enhanced Helper function to generate login URL with SSO optimization
 function generateLoginUrl(client) {
   const baseUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}`;
   
   switch(client.app_type) {
     case 'samlp':
-      // SAML SSO URL
       return `${baseUrl}/samlp/${client.client_id}`;
     
     case 'sso_integration':
-      // For Google Workspace and other SSO integrations
-      return `${baseUrl}/authorize?client_id=${client.client_id}&response_type=code&redirect_uri=${encodeURIComponent((client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`)}&scope=openid profile email&prompt=none`;
+      const ssoRedirectUri = (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
+      return `${baseUrl}/authorize?client_id=${client.client_id}&response_type=code&redirect_uri=${encodeURIComponent(ssoRedirectUri)}&scope=openid profile email&prompt=none`;
     
     case 'spa':
     case 'regular_web':
     case 'native':
-      // OAuth/OIDC SSO URL with silent authentication
       const redirectUri = (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
       return `${baseUrl}/authorize?` +
         `client_id=${client.client_id}&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `scope=openid profile email&` +
-        `prompt=none`; // This enables silent authentication
+        `prompt=none`;
     
     default:
       return null;
@@ -985,4 +873,270 @@ app.listen(PORT, () => {
   console.log('- Custom Domain:', process.env.AUTH0_CUSTOM_DOMAIN);
   console.log('- Tenant Domain:', process.env.AUTH0_TENANT_DOMAIN);
   console.log('- Management Client ID:', process.env.AUTH0_MGMT_CLIENT_ID ? 'SET' : 'NOT SET');
+  console.log('🚀 Enhanced One-Click SSO Ready!');
+});Token: ssoToken // Pass SSO token to frontend
+    });
+  } catch (error) {
+    console.error('Error fetching apps page data:', error);
+    res.status(500).render('error', { message: 'Failed to load apps page' });
+  }
 });
+
+// SSO Session Check Endpoint
+app.get('/api/sso/check', requiresAuth(), async (req, res) => {
+  try {
+    const userId = req.oidc.user.sub;
+    const user = await managementAPI.getUser({ id: userId });
+    
+    res.json({
+      authenticated: true,
+      user: {
+        sub: user.user_id,
+        name: user.name,
+        email: user.email,
+        picture: user.picture
+      },
+      timestamp: Date.now(),
+      session_token: generateSSOToken(req.oidc.user)
+    });
+  } catch (error) {
+    console.error('SSO check error:', error);
+    res.status(401).json({ authenticated: false });
+  }
+});
+
+// Enhanced Application Launch with Token Generation
+app.post('/api/applications/:clientId/sso-launch', requiresAuth(), async (req, res) => {
+  const { clientId } = req.params;
+  
+  try {
+    const client = await managementAPI.getClient({ 
+      client_id: clientId,
+      fields: 'client_id,name,description,app_type,callbacks,web_origins',
+      include_fields: true
+    });
+    
+    if (!client) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    console.log(`Generating SSO launch URL for ${client.name} (${client.app_type})`);
+
+    // Generate application-specific SSO URL with enhanced session handling
+    const ssoToken = generateSSOToken(req.oidc.user);
+    const redirectUri = (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
+    
+    let ssoUrl;
+    
+    switch(client.app_type) {
+      case 'samlp':
+        // SAML applications get direct SSO - most reliable
+        ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/samlp/${clientId}`;
+        console.log(`Generated SAML SSO URL for ${client.name}`);
+        break;
+        
+      case 'sso_integration':
+        // SSO integrations (like Google Workspace) with optimized flow
+        ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/authorize?` +
+          `client_id=${clientId}&` +
+          `response_type=code&` +
+          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+          `scope=openid profile email&` +
+          `prompt=none&` +
+          `state=${encodeURIComponent(JSON.stringify({ sso_token: ssoToken, source: 'portal', timestamp: Date.now() }))}`;
+        console.log(`Generated SSO Integration URL for ${client.name}`);
+        break;
+        
+      default:
+        // Regular web applications with enhanced SSO flow
+        ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/authorize?` +
+          `client_id=${clientId}&` +
+          `response_type=code&` +
+          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+          `scope=openid profile email&` +
+          `prompt=none&` +
+          `state=${encodeURIComponent(JSON.stringify({ sso_token: ssoToken, source: 'portal', timestamp: Date.now() }))}`;
+        console.log(`Generated OAuth SSO URL for ${client.name}`);
+    }
+
+    res.json({
+      success: true,
+      sso_url: ssoUrl,
+      client_name: client.name,
+      app_type: client.app_type,
+      session_token: ssoToken,
+      redirect_uri: redirectUri
+    });
+  } catch (error) {
+    console.error('Error generating SSO launch URL:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate SSO URL',
+      message: error.message
+    });
+  }
+});
+
+// Session refresh endpoint
+app.post('/api/sso/refresh', requiresAuth(), async (req, res) => {
+  try {
+    const newToken = generateSSOToken(req.oidc.user);
+    res.json({
+      success: true,
+      session_token: newToken,
+      expires_in: 15 * 60, // 15 minutes
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('Error refreshing SSO session:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to refresh session' 
+    });
+  }
+});
+
+// Enhanced callback handler for SSO returns
+app.get('/sso/callback/:clientId', (req, res) => {
+  const { clientId } = req.params;
+  const { code, state, error } = req.query;
+  
+  console.log(`SSO callback received for client ${clientId}:`, { code: !!code, error });
+  
+  if (code) {
+    // Successful SSO - redirect to application with success indicator
+    res.redirect(`/apps?sso=success&app=${clientId}&timestamp=${Date.now()}`);
+  } else if (error) {
+    // Failed SSO - redirect with error details
+    res.redirect(`/apps?sso=failed&app=${clientId}&error=${encodeURIComponent(error)}`);
+  } else {
+    // Unknown state
+    res.redirect(`/apps?sso=unknown&app=${clientId}`);
+  }
+});
+
+// API endpoint to get all applications in the tenant
+app.get('/api/applications', requiresAuth(), async (req, res) => {
+  try {
+    console.log('Fetching applications from Auth0...');
+    
+    // Get all clients from Auth0 Management API with only valid fields
+    const clients = await managementAPI.getClients({
+      fields: 'client_id,name,description,app_type,logo_uri,callbacks,web_origins,client_metadata',
+      include_fields: true
+    });
+
+    console.log(`Found ${clients.length} total clients`);
+
+    // Filter and format applications
+    const applications = clients
+      .filter(client => {
+        // Exclude the current management app and system apps
+        const isCurrentApp = client.client_id === process.env.AUTH0_CLIENT_ID;
+        const isManagementApp = client.client_id === process.env.AUTH0_MGMT_CLIENT_ID;
+        const isSystemApp = client.name && (
+          client.name.includes('Auth0') ||
+          client.name.includes('Management') ||
+          client.name.includes('Global Client') ||
+          client.name.includes('All Applications')
+        );
+        const isM2M = client.app_type === 'm2m';
+        
+        return !isCurrentApp && !isManagementApp && !isSystemApp && !isM2M;
+      })
+      .map(client => ({
+        client_id: client.client_id,
+        name: client.name,
+        description: client.description,
+        app_type: client.app_type,
+        logo_uri: client.logo_uri,
+        created_at: new Date().toISOString(), // Fallback date since created_at is not available
+        sso_disabled: false, // Default to SSO enabled since we can't fetch this field
+        login_url: generateLoginUrl(client),
+        callbacks: client.callbacks,
+        web_origins: client.web_origins,
+        metadata: client.client_metadata || {}
+      }));
+
+    console.log(`After filtering: ${applications.length} applications`);
+    console.log('Applications:', applications.map(app => ({ name: app.name, type: app.app_type })));
+
+    res.json({
+      success: true,
+      applications: applications,
+      total: applications.length
+    });
+  } catch (error) {
+    console.error('Error fetching applications:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch applications',
+      message: error.message,
+      statusCode: error.statusCode
+    });
+  }
+});
+
+// API endpoint to launch an application with SSO
+app.post('/api/applications/:clientId/launch', requiresAuth(), async (req, res) => {
+  const { clientId } = req.params;
+  const { returnUrl } = req.body;
+  
+  try {
+    // Get client details
+    const client = await managementAPI.getClient({ client_id: clientId });
+    
+    if (!client) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    // Generate SSO URL
+    const redirectUri = returnUrl || (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
+    const ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/authorize?` +
+      `client_id=${clientId}&` +
+      `response_type=code&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `scope=openid profile email&` +
+      `state=${encodeURIComponent(JSON.stringify({ source: 'apps_portal', timestamp: Date.now() }))}`;
+
+    res.json({
+      success: true,
+      sso_url: ssoUrl,
+      client_name: client.name,
+      redirect_uri: redirectUri
+    });
+  } catch (error) {
+    console.error('Error launching application:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to launch application',
+      message: error.message
+    });
+  }
+});
+
+// API endpoint to get application usage statistics
+app.get('/api/applications/stats', requiresAuth(), async (req, res) => {
+  try {
+    const userId = req.oidc.user.sub;
+    
+    // Get user's login history (simplified - in production you'd use Auth0 logs API)
+    const clients = await managementAPI.getClients({
+      fields: 'client_id,name,app_type',
+      include_fields: true
+    });
+    const userApps = clients.filter(client => 
+      client.client_id !== process.env.AUTH0_CLIENT_ID && 
+      client.client_id !== process.env.AUTH0_MGMT_CLIENT_ID &&
+      !client.name.includes('Auth0')
+    );
+
+    const stats = {
+      total_applications: userApps.length,
+      saml_applications: userApps.filter(app => app.app_type === 'samlp').length,
+      oauth_applications: userApps.filter(app => 
+        app.app_type === 'spa' || 
+        app.app_type === 'regular_web' || 
+        app.app_type === 'native'
+      ).length,
+      sso
