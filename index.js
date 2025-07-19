@@ -15,13 +15,13 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// Auth0 configuration - using custom domain for login
+// Auth0 configuration - ALWAYS use custom domain for login/logout
 const config = {
   authRequired: false,
   auth0Logout: true,
   baseURL: process.env.BASE_URL || 'http://localhost:3000',
   clientID: process.env.AUTH0_CLIENT_ID,
-  issuerBaseURL: `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}`,
+  issuerBaseURL: `https://${process.env.AUTH0_CUSTOM_DOMAIN}`, // ALWAYS custom domain for auth
   clientSecret: process.env.AUTH0_CLIENT_SECRET,
   secret: process.env.SESSION_SECRET,
   routes: {
@@ -57,7 +57,7 @@ function generateSSOToken(user) {
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + (15 * 60), // 15 minutes
     aud: 'sso-portal',
-    iss: process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN,
+    iss: process.env.AUTH0_CUSTOM_DOMAIN, // Always use custom domain
     nonce: crypto.randomBytes(16).toString('hex')
   };
   
@@ -68,7 +68,7 @@ function generateSSOToken(user) {
 
 // Helper function to generate login URL with SSO optimization
 function generateLoginUrl(client) {
-  const baseUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}`;
+  const baseUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}`; // Always use custom domain
   
   switch(client.app_type) {
     case 'samlp':
@@ -465,7 +465,7 @@ app.post('/enroll-mfa', requiresAuth(), async (req, res) => {
       user_id: userId
     });
     
-    res.redirect(`https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}/mfa/associate?ticket=${enrollmentTicket.ticket_id}&enrollment_type=${method}`);
+    res.redirect(`https://${process.env.AUTH0_CUSTOM_DOMAIN}/mfa/associate?ticket=${enrollmentTicket.ticket_id}&enrollment_type=${method}`);
   } catch (error) {
     console.error('Error creating MFA enrollment ticket:', error);
     res.redirect('/security?error=Failed to start MFA enrollment');
@@ -563,13 +563,13 @@ app.post('/api/applications/:clientId/sso-launch', requiresAuth(), async (req, r
     switch(client.app_type) {
       case 'samlp':
         // SAML applications get direct SSO - most reliable
-        ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}/samlp/${clientId}`;
+        ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/samlp/${clientId}`;
         console.log(`Generated SAML SSO URL for ${client.name}`);
         break;
         
       case 'sso_integration':
         // SSO integrations (like Google Workspace) with optimized flow
-        ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}/authorize?` +
+        ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/authorize?` +
           `client_id=${clientId}&` +
           `response_type=code&` +
           `redirect_uri=${encodeURIComponent(redirectUri)}&` +
@@ -581,7 +581,7 @@ app.post('/api/applications/:clientId/sso-launch', requiresAuth(), async (req, r
         
       default:
         // Regular web applications with enhanced SSO flow
-        ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}/authorize?` +
+        ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/authorize?` +
           `client_id=${clientId}&` +
           `response_type=code&` +
           `redirect_uri=${encodeURIComponent(redirectUri)}&` +
@@ -724,7 +724,7 @@ app.post('/api/applications/:clientId/launch', requiresAuth(), async (req, res) 
 
     // Generate SSO URL
     const redirectUri = returnUrl || (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
-    const ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}/authorize?` +
+    const ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/authorize?` +
       `client_id=${clientId}&` +
       `response_type=code&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
@@ -1109,8 +1109,16 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Account Management Portal running on port ${PORT}`);
   console.log('Available at:', process.env.BASE_URL || `http://localhost:${PORT}`);
   console.log('Auth0 Configuration:');
-  console.log('- Custom Domain:', process.env.AUTH0_CUSTOM_DOMAIN || 'Not set');
-  console.log('- Tenant Domain:', process.env.AUTH0_TENANT_DOMAIN || 'Not set');
+  console.log('- Custom Domain:', process.env.AUTH0_CUSTOM_DOMAIN || 'REQUIRED - NOT SET!');
+  console.log('- Tenant Domain (for Management API):', process.env.AUTH0_TENANT_DOMAIN || 'REQUIRED - NOT SET!');
   console.log('- Management Client ID:', process.env.AUTH0_MGMT_CLIENT_ID ? 'SET' : 'NOT SET');
-  console.log('🚀 Enhanced One-Click SSO Ready!');
+  console.log('🚀 Enhanced One-Click SSO Ready with Custom Domain!');
+  
+  // Validate required environment variables
+  if (!process.env.AUTH0_CUSTOM_DOMAIN) {
+    console.error('❌ ERROR: AUTH0_CUSTOM_DOMAIN is required for login/logout functionality!');
+  }
+  if (!process.env.AUTH0_TENANT_DOMAIN) {
+    console.error('❌ ERROR: AUTH0_TENANT_DOMAIN is required for Management API calls!');
+  }
 });
