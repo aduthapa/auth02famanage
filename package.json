@@ -8,7 +8,12 @@
   },
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "build": "cross-env NODE_OPTIONS=--openssl-legacy-provider npm run build:internal",
+    "build:internal": "npm run clean && npm run client:build && npm run extension:build",
+    "clean": "rimraf dist",
+    "client:build": "cross-env NODE_ENV=production NODE_OPTIONS=--openssl-legacy-provider webpack --config ./build/webpack/config.js --colors -p",
+    "extension:build": "a0-ext build:server ./webtask.js ./dist && cp ./dist/$npm_package_name.extension.$npm_package_version.js ./build/bundle.js && cp ./webtask.json ./dist/webtask.json"
   },
   "dependencies": {
     "auth0": "^3.6.0",
@@ -16,7 +21,8 @@
     "ejs": "^3.1.9",
     "express": "^4.18.2",
     "express-openid-connect": "^2.17.0",
-    "express-session": "^1.17.3"
+    "express-session": "^1.17.3",
+    "cross-env": "^7.0.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
