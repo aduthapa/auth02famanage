@@ -1,53 +1,3 @@
-// Add this simple debug route to test the API - add to your index.js
-
-// Debug API endpoint to test Auth0 connection
-app.get('/api/debug', requiresAuth(), async (req, res) => {
-  try {
-    console.log('Debug API called');
-    
-    // Test 1: Basic response
-    const basicTest = {
-      message: 'API is working',
-      timestamp: new Date().toISOString(),
-      user: req.oidc.user.sub
-    };
-    
-    // Test 2: Try to get clients
-    console.log('Attempting to fetch clients...');
-    const clients = await managementAPI.getClients({
-      fields: 'client_id,name,app_type',
-      include_fields: true
-    });
-    
-    console.log(`Found ${clients.length} clients`);
-    
-    // Test 3: Filter clients
-    const filteredClients = clients.filter(client => 
-      client.client_id !== process.env.AUTH0_CLIENT_ID && 
-      client.client_id !== process.env.AUTH0_MGMT_CLIENT_ID
-    );
-    
-    console.log(`After filtering: ${filteredClients.length} clients`);
-    
-    res.json({
-      success: true,
-      basicTest,
-      totalClients: clients.length,
-      filteredClients: filteredClients.length,
-      sampleClient: filteredClients[0] || null,
-      managementClientId: process.env.AUTH0_MGMT_CLIENT_ID ? 'SET' : 'NOT SET'
-    });
-    
-  } catch (error) {
-    console.error('Debug API Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      statusCode: error.statusCode || 'unknown'
-    });
-  }
-});
-
 // index.js - Complete Enhanced Account Management Portal with Apps
 const express = require('express');
 const session = require('express-session');
@@ -97,6 +47,54 @@ const managementAPI = new ManagementClient({
   clientSecret: process.env.AUTH0_MGMT_CLIENT_SECRET,
   audience: `https://${process.env.AUTH0_TENANT_DOMAIN}/api/v2/`,
   scope: 'read:users update:users delete:guardian_enrollments create:guardian_enrollment_tickets read:user_idp_tokens create:user_tickets read:clients read:client_grants read:connections'
+});
+
+// Debug API endpoint to test Auth0 connection
+app.get('/api/debug', requiresAuth(), async (req, res) => {
+  try {
+    console.log('Debug API called');
+    
+    // Test 1: Basic response
+    const basicTest = {
+      message: 'API is working',
+      timestamp: new Date().toISOString(),
+      user: req.oidc.user.sub
+    };
+    
+    // Test 2: Try to get clients
+    console.log('Attempting to fetch clients...');
+    const clients = await managementAPI.getClients({
+      fields: 'client_id,name,app_type',
+      include_fields: true
+    });
+    
+    console.log(`Found ${clients.length} clients`);
+    
+    // Test 3: Filter clients
+    const filteredClients = clients.filter(client => 
+      client.client_id !== process.env.AUTH0_CLIENT_ID && 
+      client.client_id !== process.env.AUTH0_MGMT_CLIENT_ID
+    );
+    
+    console.log(`After filtering: ${filteredClients.length} clients`);
+    
+    res.json({
+      success: true,
+      basicTest,
+      totalClients: clients.length,
+      filteredClients: filteredClients.length,
+      sampleClient: filteredClients[0] || null,
+      managementClientId: process.env.AUTH0_MGMT_CLIENT_ID ? 'SET' : 'NOT SET'
+    });
+    
+  } catch (error) {
+    console.error('Debug API Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      statusCode: error.statusCode || 'unknown'
+    });
+  }
 });
 
 // Home route
@@ -490,21 +488,31 @@ app.get('/apps', requiresAuth(), async (req, res) => {
 // API endpoint to get all applications in the tenant
 app.get('/api/applications', requiresAuth(), async (req, res) => {
   try {
+    console.log('Fetching applications from Auth0...');
+    
     // Get all clients from Auth0 Management API
     const clients = await managementAPI.getClients({
       fields: 'client_id,name,description,app_type,logo_uri,created_at,sso_disabled,callbacks,web_origins,client_metadata',
       include_fields: true
     });
 
+    console.log(`Found ${clients.length} total clients`);
+
     // Filter and format applications
     const applications = clients
       .filter(client => {
         // Exclude the current management app and system apps
-        return client.client_id !== process.env.AUTH0_CLIENT_ID && 
-               client.client_id !== process.env.AUTH0_MGMT_CLIENT_ID &&
-               !client.name.includes('Auth0') &&
-               !client.name.includes('Management') &&
-               client.app_type !== 'm2m'; // Exclude machine-to-machine apps for SSO
+        const isCurrentApp = client.client_id === process.env.AUTH0_CLIENT_ID;
+        const isManagementApp = client.client_id === process.env.AUTH0_MGMT_CLIENT_ID;
+        const isSystemApp = client.name && (
+          client.name.includes('Auth0') ||
+          client.name.includes('Management') ||
+          client.name.includes('Global Client') ||
+          client.name.includes('All Applications')
+        );
+        const isM2M = client.app_type === 'm2m';
+        
+        return !isCurrentApp && !isManagementApp && !isSystemApp && !isM2M;
       })
       .map(client => ({
         client_id: client.client_id,
@@ -520,6 +528,9 @@ app.get('/api/applications', requiresAuth(), async (req, res) => {
         metadata: client.client_metadata || {}
       }));
 
+    console.log(`After filtering: ${applications.length} applications`);
+    console.log('Applications:', applications.map(app => ({ name: app.name, type: app.app_type })));
+
     res.json({
       success: true,
       applications: applications,
@@ -530,7 +541,8 @@ app.get('/api/applications', requiresAuth(), async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch applications',
-      message: error.message
+      message: error.message,
+      statusCode: error.statusCode
     });
   }
 });
@@ -550,7 +562,7 @@ app.post('/api/applications/:clientId/launch', requiresAuth(), async (req, res) 
 
     // Generate SSO URL
     const redirectUri = returnUrl || (client.callbacks && client.callbacks[0]) || `${process.env.BASE_URL}/apps`;
-    const ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN || process.env.AUTH0_TENANT_DOMAIN}/authorize?` +
+    const ssoUrl = `https://${process.env.AUTH0_CUSTOM_DOMAIN}/authorize?` +
       `client_id=${clientId}&` +
       `response_type=code&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
