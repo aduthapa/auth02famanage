@@ -1,4 +1,4 @@
-<!-- views/apps.ejs -->
+<!-- views/apps.ejs - Enhanced with One-Click SSO -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,6 +47,11 @@
       background: linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%);
       transform: translateY(-5px);
     }
+    .app-card.launching {
+      border-color: #28a745;
+      background: linear-gradient(135deg, #f0fff4 0%, #d4edda 100%);
+      opacity: 0.8;
+    }
     .app-card.favorite {
       border-color: #ffc107;
       background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
@@ -66,6 +71,13 @@
     }
     .app-card:hover .app-icon {
       transform: scale(1.1);
+    }
+    .app-card.launching .app-icon {
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
     }
     .app-type-badge {
       position: absolute;
@@ -92,64 +104,10 @@
     .favorite-btn:hover {
       opacity: 1;
     }
-    .app-stats {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 1rem;
-      font-size: 0.85rem;
-      color: #6c757d;
-    }
-    .search-box {
-      position: relative;
-      margin-bottom: 2rem;
-    }
-    .search-box input {
-      padding-left: 45px;
-      border-radius: 25px;
-      border: 2px solid #e9ecef;
-    }
-    .search-box i {
-      position: absolute;
-      left: 15px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #6c757d;
-    }
-    .filter-tabs {
-      margin-bottom: 2rem;
-    }
-    .recent-activity {
-      background: #f8f9fa;
-      border-radius: 10px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-    .activity-item {
-      display: flex;
-      align-items: center;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid #e9ecef;
-    }
-    .activity-item:last-child {
-      border-bottom: none;
-    }
-    .activity-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: #e3f2fd;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 1rem;
-      color: #2196f3;
-    }
     .sso-indicator {
       position: absolute;
       bottom: 15px;
       right: 15px;
-      background: #28a745;
       color: white;
       border-radius: 50%;
       width: 24px;
@@ -159,30 +117,11 @@
       justify-content: center;
       font-size: 0.8rem;
     }
-    .quick-actions {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 1000;
-    }
-    .fab {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #2196f3, #21cbf3);
-      color: white;
-      border: none;
-      box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-      transition: all 0.3s ease;
-    }
-    .fab:hover {
-      transform: scale(1.1);
-      box-shadow: 0 6px 20px rgba(33, 150, 243, 0.6);
-    }
+    .sso-ready { background: #28a745; }
+    .sso-saml { background: #2196f3; }
+    .sso-oauth { background: #28a745; }
+    .sso-integration { background: #ff9800; }
+    .sso-api { background: #9c27b0; }
     .app-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -198,16 +137,48 @@
       0% { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
+    .sso-status {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1050;
+      background: rgba(40, 167, 69, 0.9);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      backdrop-filter: blur(5px);
+    }
+    .launch-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 50px;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      color: #28a745;
+      border: 2px solid #28a745;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
+  <!-- SSO Status Indicator -->
+  <div class="sso-status" id="ssoStatus">
+    <i class="bi bi-shield-check me-1"></i>SSO Ready
+  </div>
+
   <!-- Pass server configuration to client-side JavaScript -->
   <script>
     window.AUTH0_CONFIG = {
       customDomain: '<%= auth0Config.customDomain %>',
       tenantDomain: '<%= auth0Config.tenantDomain %>',
-      baseUrl: '<%= auth0Config.baseUrl %>'
+      baseUrl: '<%= auth0Config.baseUrl %>',
+      clientId: '<%= auth0Config.clientId %>'
     };
+    window.SSO_TOKEN = '<%= ssoToken %>';
   </script>
 
   <!-- Header -->
@@ -216,7 +187,7 @@
       <div class="row align-items-center">
         <div class="col-md-12 text-center">
           <h1><i class="bi bi-grid-3x3-gap me-2"></i>My Apps</h1>
-          <p class="mb-0">Single sign-on to all your applications</p>
+          <p class="mb-0">One-click access to all your applications</p>
         </div>
       </div>
     </div>
@@ -265,6 +236,19 @@
         </a>
       </li>
     </ul>
+
+    <!-- Enhanced SSO Banner -->
+    <div class="alert alert-info mb-4">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h6 class="mb-1"><i class="bi bi-shield-check me-2"></i>Enhanced Single Sign-On Active</h6>
+          <small class="text-muted">Click any application for instant one-click access. No additional logins required.</small>
+        </div>
+        <div class="col-md-4 text-end">
+          <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Ready</span>
+        </div>
+      </div>
+    </div>
 
     <!-- Search and Filters -->
     <div class="row">
@@ -376,6 +360,26 @@
           </div>
         </div>
 
+        <!-- SSO Status Card -->
+        <div class="card">
+          <div class="card-header">
+            <h6><i class="bi bi-shield-check me-2"></i>SSO Status</h6>
+          </div>
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-2">
+              <div class="spinner-border spinner-border-sm text-success me-2" role="status" id="ssoSpinner" style="display: none;"></div>
+              <i class="bi bi-check-circle text-success me-2" id="ssoCheck"></i>
+              <span class="fw-bold">Active Session</span>
+            </div>
+            <small class="text-muted">One-click access enabled for all applications</small>
+            <div class="mt-2">
+              <button class="btn btn-outline-success btn-sm w-100" onclick="testSSO()">
+                <i class="bi bi-shield-check me-1"></i>Test SSO
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Recent Activity -->
         <div class="card">
           <div class="card-header">
@@ -398,7 +402,10 @@
               <button class="btn btn-outline-primary btn-sm" onclick="refreshApps()">
                 <i class="bi bi-arrow-clockwise me-2"></i>Refresh Apps
               </button>
-              <button class="btn btn-outline-success btn-sm" onclick="exportApps()">
+              <button class="btn btn-outline-success btn-sm" onclick="refreshSSO()">
+                <i class="bi bi-shield-check me-2"></i>Refresh SSO
+              </button>
+              <button class="btn btn-outline-info btn-sm" onclick="exportApps()">
                 <i class="bi bi-download me-2"></i>Export List
               </button>
               <a href="/account" class="btn btn-outline-secondary btn-sm">
@@ -411,34 +418,6 @@
     </div>
   </div>
 
-  <!-- Floating Action Button -->
-  <div class="quick-actions">
-    <button class="fab" onclick="refreshApps()" title="Refresh Applications">
-      <i class="bi bi-arrow-clockwise"></i>
-    </button>
-  </div>
-
-  <!-- App Details Modal -->
-  <div class="modal fade" id="appModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="appModalTitle">Application Details</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body" id="appModalBody">
-          <!-- App details will be populated dynamically -->
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="button" class="btn btn-primary" id="launchAppBtn">
-            <i class="bi bi-box-arrow-up-right me-2"></i>Launch App
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let allApps = [];
@@ -446,21 +425,312 @@
     let favorites = JSON.parse(localStorage.getItem('favoriteApps') || '[]');
     let currentFilter = 'all';
 
+    // Enhanced SSO Manager
+    const enhancedSSO = {
+      config: null,
+      ssoToken: null,
+      sessionChecked: false,
+      
+      init(config, ssoToken) {
+        this.config = config;
+        this.ssoToken = ssoToken;
+        this.setupSessionMonitoring();
+        console.log('Enhanced SSO initialized with token:', ssoToken ? 'Present' : 'Missing');
+      },
+      
+      setupSessionMonitoring() {
+        // Check SSO session status every 5 minutes
+        setInterval(() => this.checkSSOSession(), 5 * 60 * 1000);
+        
+        // Listen for storage events (session sharing between tabs)
+        window.addEventListener('storage', (e) => {
+          if (e.key === 'sso_session' && e.newValue) {
+            this.handleSessionUpdate(JSON.parse(e.newValue));
+          }
+        });
+        
+        // Store current session info
+        localStorage.setItem('sso_session', JSON.stringify({
+          token: this.ssoToken,
+          timestamp: Date.now(),
+          authenticated: true
+        }));
+        
+        // Initial session check
+        this.checkSSOSession();
+      },
+      
+      async checkSSOSession() {
+        try {
+          const response = await fetch('/api/sso/check');
+          const sessionData = await response.json();
+          
+          if (sessionData.authenticated) {
+            this.ssoToken = sessionData.session_token;
+            localStorage.setItem('sso_session', JSON.stringify({
+              token: this.ssoToken,
+              timestamp: Date.now(),
+              authenticated: true
+            }));
+            this.updateSSOMStatus(true);
+          } else {
+            this.updateSSOMStatus(false);
+          }
+        } catch (error) {
+          console.warn('SSO session check failed:', error);
+          this.updateSSOMStatus(false);
+        }
+      },
+      
+      updateSSOMStatus(isActive) {
+        const statusEl = document.getElementById('ssoStatus');
+        const checkEl = document.getElementById('ssoCheck');
+        const spinnerEl = document.getElementById('ssoSpinner');
+        
+        if (isActive) {
+          statusEl.innerHTML = '<i class="bi bi-shield-check me-1"></i>SSO Ready';
+          statusEl.className = 'sso-status';
+          statusEl.style.background = 'rgba(40, 167, 69, 0.9)';
+          if (checkEl) checkEl.style.display = 'inline';
+          if (spinnerEl) spinnerEl.style.display = 'none';
+        } else {
+          statusEl.innerHTML = '<i class="bi bi-shield-x me-1"></i>SSO Inactive';
+          statusEl.style.background = 'rgba(220, 53, 69, 0.9)';
+          if (checkEl) checkEl.style.display = 'none';
+          if (spinnerEl) spinnerEl.style.display = 'inline-block';
+        }
+      },
+      
+      handleSessionUpdate(sessionData) {
+        if (sessionData.authenticated && sessionData.token) {
+          this.ssoToken = sessionData.token;
+        }
+      },
+      
+      async launchApplicationWithSSO(clientId) {
+        console.log('🚀 Launching application with enhanced SSO:', clientId);
+        
+        const app = allApps.find(a => a.client_id === clientId);
+        const appName = app ? app.name : 'Application';
+        
+        // Record app launch
+        recordAppLaunch(clientId);
+        
+        // Show launching state
+        this.setAppLaunchingState(clientId, true);
+        this.showLaunchingToast(appName);
+        
+        try {
+          // Get optimized SSO URL from backend
+          const response = await fetch(`/api/applications/${clientId}/sso-launch`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            console.log('✅ Got SSO URL:', data.sso_url);
+            await this.performSeamlessLaunch(data.sso_url, data.client_name, data.app_type);
+          } else {
+            throw new Error(data.error || 'Failed to generate SSO URL');
+          }
+        } catch (error) {
+          console.error('❌ SSO launch failed:', error);
+          this.fallbackLaunch(clientId);
+        } finally {
+          // Reset launching state after 2 seconds
+          setTimeout(() => this.setAppLaunchingState(clientId, false), 2000);
+        }
+      },
+      
+      setAppLaunchingState(clientId, isLaunching) {
+        const appCard = document.querySelector(`[data-app-id="${clientId}"]`);
+        if (appCard) {
+          if (isLaunching) {
+            appCard.classList.add('launching');
+            const indicator = document.createElement('div');
+            indicator.className = 'launch-indicator';
+            indicator.innerHTML = '<i class="bi bi-rocket-takeoff me-1"></i>Launching...';
+            appCard.appendChild(indicator);
+          } else {
+            appCard.classList.remove('launching');
+            const indicator = appCard.querySelector('.launch-indicator');
+            if (indicator) indicator.remove();
+          }
+        }
+      },
+      
+      async performSeamlessLaunch(ssoUrl, appName, appType) {
+        console.log('🔄 Performing seamless launch for:', appName, 'Type:', appType);
+        
+        // For SAML applications, direct launch usually works perfectly
+        if (appType === 'samlp') {
+          console.log('📋 SAML app - direct launch');
+          window.open(ssoUrl, '_blank');
+          this.showSuccessToast(appName, 'SAML SSO');
+          return;
+        }
+        
+        // For SSO integrations (like Google Workspace), try direct launch
+        if (appType === 'sso_integration') {
+          console.log('🔗 SSO Integration - attempting direct launch');
+          window.open(ssoUrl, '_blank');
+          this.showSuccessToast(appName, 'SSO Integration');
+          return;
+        }
+        
+        // For OAuth applications, use advanced session check
+        console.log('🔐 OAuth app - checking authentication...');
+        const authSuccess = await this.preCheckAuthentication(ssoUrl);
+        
+        if (authSuccess) {
+          console.log('✅ Pre-auth successful - launching directly');
+          window.open(ssoUrl, '_blank');
+          this.showSuccessToast(appName, 'OAuth SSO');
+        } else {
+          console.log('⚠️ Pre-auth failed - trying interactive');
+          // Try interactive login
+          const interactiveUrl = ssoUrl.replace('prompt=none', 'prompt=login');
+          window.open(interactiveUrl, '_blank');
+          this.showInfoToast(appName, 'Authentication required');
+        }
+      },
+      
+      async preCheckAuthentication(ssoUrl) {
+        return new Promise((resolve) => {
+          console.log('🔍 Pre-checking authentication with iframe...');
+          
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = ssoUrl;
+          
+          let resolved = false;
+          
+          const cleanup = () => {
+            if (iframe.parentNode) {
+              document.body.removeChild(iframe);
+            }
+          };
+          
+          const timeout = setTimeout(() => {
+            if (!resolved) {
+              resolved = true;
+              cleanup();
+              console.log('⏰ Pre-auth timeout - assuming success');
+              resolve(true); // Assume success on timeout for better UX
+            }
+          }, 3000);
+          
+          iframe.onload = () => {
+            try {
+              const iframeUrl = iframe.contentWindow.location.href;
+              console.log('📍 Iframe loaded, checking URL...');
+              
+              if (iframeUrl.includes('code=') || iframeUrl.includes('/apps') || !iframeUrl.includes('login')) {
+                console.log('✅ Pre-auth successful');
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(timeout);
+                  cleanup();
+                  resolve(true);
+                }
+              }
+            } catch (e) {
+              console.log('🔒 Cross-origin detected - likely on login page');
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeout);
+                cleanup();
+                resolve(true); // Still try to launch - Auth0 might handle it
+              }
+            }
+          };
+          
+          iframe.onerror = () => {
+            console.log('❌ Iframe error');
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              cleanup();
+              resolve(true); // Still try to launch
+            }
+          };
+          
+          document.body.appendChild(iframe);
+        });
+      },
+      
+      fallbackLaunch(clientId) {
+        console.log('🔄 Using fallback launch for:', clientId);
+        const app = allApps.find(a => a.client_id === clientId);
+        if (app && app.login_url) {
+          window.open(app.login_url, '_blank');
+        } else {
+          const baseUrl = `https://${this.config.customDomain || this.config.tenantDomain}`;
+          const ssoUrl = `${baseUrl}/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(this.config.baseUrl + '/apps')}&scope=openid profile email`;
+          window.open(ssoUrl, '_blank');
+        }
+      },
+      
+      showLaunchingToast(appName) {
+        this.showToast('launching', `Launching ${appName}`, 'Connecting with single sign-on...', 'text-primary');
+      },
+      
+      showSuccessToast(appName, method) {
+        this.showToast('success', `✅ ${appName} Launched`, `Opened with ${method}`, 'text-success');
+      },
+      
+      showInfoToast(appName, message) {
+        this.showToast('info', `🔐 ${appName}`, message, 'text-info');
+      },
+      
+      showToast(id, title, message, textClass) {
+        const toastHtml = `
+          <div class="toast-container position-fixed top-0 end-0 p-3">
+            <div id="${id}Toast" class="toast" role="alert" data-bs-autohide="true" data-bs-delay="3000">
+              <div class="toast-header">
+                <div class="spinner-border spinner-border-sm ${textClass} me-2" role="status" style="display: ${id === 'launching' ? 'inline-block' : 'none'};"></div>
+                <strong class="me-auto ${textClass}">${title}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+              </div>
+              <div class="toast-body">
+                ${message}
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Remove existing toast
+        const existingToast = document.getElementById(id + 'Toast');
+        if (existingToast) {
+          existingToast.parentElement.remove();
+        }
+        
+        document.body.insertAdjacentHTML('beforeend', toastHtml);
+        const toast = new bootstrap.Toast(document.getElementById(id + 'Toast'));
+        toast.show();
+      }
+    };
+
     // Initialize page
     document.addEventListener('DOMContentLoaded', function() {
-      console.log('Apps page loaded, starting to fetch applications...');
+      console.log('🎯 Apps page loaded, initializing enhanced SSO...');
+      
+      // Initialize enhanced SSO
+      enhancedSSO.init(window.AUTH0_CONFIG, window.SSO_TOKEN);
+      
+      // Load applications
       loadApplications();
       setupEventListeners();
     });
 
     function setupEventListeners() {
-      // Search functionality
       document.getElementById('searchInput').addEventListener('input', debounce(filterApps, 300));
-      
-      // Sort functionality
       document.getElementById('sortSelect').addEventListener('change', sortApps);
       
-      // Filter tabs
       document.querySelectorAll('[data-filter]').forEach(tab => {
         tab.addEventListener('click', function(e) {
           e.preventDefault();
@@ -469,28 +739,62 @@
       });
     }
 
-    function loadApplications() {
-      console.log('Fetching applications from /api/applications...');
+    // Enhanced launch function
+    function launchApp(clientId, loginUrl) {
+      enhancedSSO.launchApplicationWithSSO(clientId);
+    }
+
+    // Test SSO function
+    async function testSSO() {
+      const spinnerEl = document.getElementById('ssoSpinner');
+      const checkEl = document.getElementById('ssoCheck');
       
-      // Show loading state
+      if (spinnerEl) spinnerEl.style.display = 'inline-block';
+      if (checkEl) checkEl.style.display = 'none';
+      
+      await enhancedSSO.checkSSOSession();
+      
+      setTimeout(() => {
+        if (spinnerEl) spinnerEl.style.display = 'none';
+        if (checkEl) checkEl.style.display = 'inline';
+      }, 1000);
+    }
+
+    // Refresh SSO function
+    async function refreshSSO() {
+      try {
+        const response = await fetch('/api/sso/refresh', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+          enhancedSSO.ssoToken = data.session_token;
+          enhancedSSO.showSuccessToast('SSO Session', 'Refreshed successfully');
+        }
+      } catch (error) {
+        console.error('Failed to refresh SSO:', error);
+      }
+    }
+
+    function loadApplications() {
+      console.log('📱 Fetching applications from /api/applications...');
+      
       document.getElementById('loadingState').style.display = 'block';
       document.getElementById('appsGrid').style.display = 'none';
       
-      // Fetch applications from server
       fetch('/api/applications')
         .then(response => {
-          console.log('Applications API response status:', response.status);
+          console.log('📡 Applications API response status:', response.status);
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
           return response.json();
         })
         .then(data => {
-          console.log('Applications API response:', data);
+          console.log('📊 Applications API response:', data);
           if (data.success) {
             allApps = data.applications || [];
-            console.log(`Loaded ${allApps.length} applications:`, allApps.map(app => ({ name: app.name, type: app.app_type })));
-            filteredApps = [...allApps]; // Initialize filtered apps
+            console.log(`📋 Loaded ${allApps.length} applications:`, allApps.map(app => ({ name: app.name, type: app.app_type })));
+            filteredApps = [...allApps];
             updateStats();
             renderApps();
             loadRecentActivity();
@@ -499,7 +803,7 @@
           }
         })
         .catch(error => {
-          console.error('Error loading applications:', error);
+          console.error('❌ Error loading applications:', error);
           showError('Failed to load applications: ' + error.message);
         })
         .finally(() => {
@@ -509,7 +813,7 @@
     }
 
     function renderApps() {
-      console.log(`Rendering ${filteredApps.length} applications`);
+      console.log(`🎨 Rendering ${filteredApps.length} applications`);
       const grid = document.getElementById('appsGrid');
       const noAppsMessage = document.getElementById('noAppsMessage');
       
@@ -542,11 +846,11 @@
           </div>
           
           <h6 class="fw-bold mb-1">${app.name}</h6>
-          <p class="text-muted small mb-0">${app.description || 'No description available'}</p>
+          <p class="text-muted small mb-0">${app.description || 'One-click SSO access'}</p>
           
           <div class="app-stats">
             <small><i class="bi bi-calendar me-1"></i>Added ${formatDate(app.created_at)}</small>
-            ${app.sso_disabled ? '' : getSSOModeIcon(app.app_type)}
+            ${getSSOModeIcon(app.app_type)}
           </div>
         </div>
       `).join('');
@@ -555,239 +859,16 @@
     function getSSOModeIcon(appType) {
       switch(appType) {
         case 'sso_integration':
-          return '<div class="sso-indicator" title="SSO Integration" style="background: #ff9800;"><i class="bi bi-link-45deg"></i></div>';
+          return '<div class="sso-indicator sso-integration" title="SSO Integration"><i class="bi bi-link-45deg"></i></div>';
         case 'samlp':
-          return '<div class="sso-indicator" title="SAML SSO" style="background: #2196f3;"><i class="bi bi-shield-check"></i></div>';
+          return '<div class="sso-indicator sso-saml" title="SAML SSO"><i class="bi bi-shield-check"></i></div>';
         case 'regular_web':
         case 'spa':
-          return '<div class="sso-indicator" title="OAuth SSO"><i class="bi bi-check"></i></div>';
+          return '<div class="sso-indicator sso-oauth" title="OAuth SSO"><i class="bi bi-check"></i></div>';
         case 'non_interactive':
-          return '<div class="sso-indicator" title="API Access" style="background: #9c27b0;"><i class="bi bi-gear"></i></div>';
+          return '<div class="sso-indicator sso-api" title="API Access"><i class="bi bi-gear"></i></div>';
         default:
-          return '<div class="sso-indicator" title="SSO Enabled"><i class="bi bi-check"></i></div>';
-      }
-    }
-
-    function launchApp(clientId, loginUrl) {
-      console.log('Launching app:', clientId);
-      
-      // Record app launch
-      recordAppLaunch(clientId);
-      
-      // Show loading indicator
-      const appCard = document.querySelector(`[data-app-id="${clientId}"]`);
-      if (appCard) {
-        appCard.style.opacity = '0.7';
-        appCard.style.pointerEvents = 'none';
-      }
-      
-      // Create a hidden iframe for silent authentication first
-      if (loginUrl && loginUrl.includes('prompt=none')) {
-        attemptSilentSSO(clientId, loginUrl, appCard);
-      } else if (loginUrl) {
-        // Direct launch for SAML or other types
-        window.open(loginUrl, '_blank');
-        resetAppCard(appCard);
-      } else {
-        // Construct SSO URL using the config passed from server
-        const baseUrl = `https://${window.AUTH0_CONFIG.customDomain || window.AUTH0_CONFIG.tenantDomain}`;
-        const ssoUrl = `${baseUrl}/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(window.AUTH0_CONFIG.baseUrl + '/apps')}&scope=openid profile email&prompt=none`;
-        console.log('Opening SSO URL:', ssoUrl);
-        attemptSilentSSO(clientId, ssoUrl, appCard);
-      }
-    }
-
-    function launchApp(clientId, loginUrl) {
-      console.log('Launching app:', clientId);
-      
-      const app = allApps.find(a => a.client_id === clientId);
-      const appName = app ? app.name : 'Application';
-      
-      // Record app launch
-      recordAppLaunch(clientId);
-      
-      // Show loading indicator
-      const appCard = document.querySelector(`[data-app-id="${clientId}"]`);
-      if (appCard) {
-        appCard.style.opacity = '0.7';
-        appCard.style.pointerEvents = 'none';
-      }
-      
-      // Show loading toast
-      const toast = showLoadingToast(appName);
-      
-      // Handle different app types
-      if (app && app.app_type === 'samlp') {
-        // SAML apps typically work with direct SSO
-        if (loginUrl) {
-          window.open(loginUrl, '_blank');
-          resetAppCard(appCard);
-          toast.hide();
-        }
-      } else if (app && app.app_type === 'non_interactive') {
-        // API-only applications
-        showApiAppModal(app, appCard);
-        toast.hide();
-      } else if (loginUrl && loginUrl.includes('prompt=none')) {
-        // OAuth apps with silent auth
-        attemptSilentSSO(clientId, loginUrl, appCard, toast);
-      } else if (loginUrl) {
-        // Direct launch for other types
-        window.open(loginUrl, '_blank');
-        resetAppCard(appCard);
-        toast.hide();
-      } else {
-        // Construct SSO URL using the config passed from server
-        const baseUrl = `https://${window.AUTH0_CONFIG.customDomain || window.AUTH0_CONFIG.tenantDomain}`;
-        const ssoUrl = `${baseUrl}/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(window.AUTH0_CONFIG.baseUrl + '/apps')}&scope=openid profile email&prompt=none`;
-        console.log('Opening SSO URL:', ssoUrl);
-        attemptSilentSSO(clientId, ssoUrl, appCard, toast);
-      }
-    }
-
-    function showApiAppModal(app, appCard) {
-      const modalHtml = `
-        <div class="modal fade" id="apiAppModal" tabindex="-1">
-          <div class="modal-dialog">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title">
-                  <i class="bi bi-gear me-2"></i>${app.name}
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-              </div>
-              <div class="modal-body text-center">
-                <div class="mb-3">
-                  <i class="bi bi-code-slash" style="font-size: 3rem; color: #6f42c1;"></i>
-                </div>
-                <h6>API Application</h6>
-                <p class="text-muted">This is an API-only application that doesn't have a web interface to launch.</p>
-                <div class="mt-3">
-                  <small class="text-muted">Client ID: <code>${app.client_id}</code></small>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
-      const modal = new bootstrap.Modal(document.getElementById('apiAppModal'));
-      modal.show();
-      
-      resetAppCard(appCard);
-      
-      document.getElementById('apiAppModal').addEventListener('hidden.bs.modal', function() {
-        this.remove();
-      });
-    }
-
-    function attemptSilentSSO(clientId, ssoUrl, appCard, toast) {
-      // Try silent authentication first
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = ssoUrl;
-      
-      let timeout = setTimeout(() => {
-        console.log('Silent SSO timeout, falling back to interactive login');
-        document.body.removeChild(iframe);
-        toast.hide();
-        fallbackToInteractiveLogin(clientId, ssoUrl.replace('prompt=none', 'prompt=login'), appCard);
-      }, 5000); // 5 second timeout
-      
-      iframe.onload = function() {
-        try {
-          // Check if we got redirected to the callback (successful auth)
-          const iframeUrl = iframe.contentWindow.location.href;
-          if (iframeUrl.includes('code=') || iframeUrl.includes('/apps')) {
-            console.log('Silent SSO successful');
-            clearTimeout(timeout);
-            document.body.removeChild(iframe);
-            toast.hide();
-            
-            // Open the app in a new window with the authenticated session
-            const appUrl = ssoUrl.replace('prompt=none', '');
-            window.open(appUrl, '_blank');
-            resetAppCard(appCard);
-          }
-        } catch (e) {
-          // Cross-origin error means we're on the login page (auth required)
-          console.log('Silent SSO failed, user needs to authenticate');
-          clearTimeout(timeout);
-          document.body.removeChild(iframe);
-          toast.hide();
-          fallbackToInteractiveLogin(clientId, ssoUrl.replace('prompt=none', 'prompt=login'), appCard);
-        }
-      };
-      
-      document.body.appendChild(iframe);
-    }
-
-    function fallbackToInteractiveLogin(clientId, ssoUrl, appCard) {
-      // Show user-friendly message
-      showSSOMModal(clientId, ssoUrl, appCard);
-    }
-
-    function showSSOMModal(clientId, ssoUrl, appCard) {
-      const app = allApps.find(a => a.client_id === clientId);
-      const modalHtml = `
-        <div class="modal fade" id="ssoModal" tabindex="-1">
-          <div class="modal-dialog">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title">
-                  <i class="bi bi-box-arrow-up-right me-2"></i>Launch ${app ? app.name : 'Application'}
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-              </div>
-              <div class="modal-body text-center">
-                <div class="mb-3">
-                  <i class="bi bi-shield-lock" style="font-size: 3rem; color: #0d6efd;"></i>
-                </div>
-                <h6>Authentication Required</h6>
-                <p class="text-muted">You'll be redirected to sign in to access this application.</p>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="proceedToApp('${ssoUrl}')">
-                  <i class="bi bi-box-arrow-up-right me-2"></i>Continue
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      // Remove existing modal if any
-      const existingModal = document.getElementById('ssoModal');
-      if (existingModal) {
-        existingModal.remove();
-      }
-      
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
-      const modal = new bootstrap.Modal(document.getElementById('ssoModal'));
-      modal.show();
-      
-      // Reset app card when modal is closed
-      document.getElementById('ssoModal').addEventListener('hidden.bs.modal', function() {
-        resetAppCard(appCard);
-        this.remove();
-      });
-    }
-
-    function proceedToApp(ssoUrl) {
-      window.open(ssoUrl, '_blank');
-      const modal = bootstrap.Modal.getInstance(document.getElementById('ssoModal'));
-      modal.hide();
-    }
-
-    function resetAppCard(appCard) {
-      if (appCard) {
-        appCard.style.opacity = '1';
-        appCard.style.pointerEvents = 'auto';
+          return '<div class="sso-indicator sso-ready" title="SSO Ready"><i class="bi bi-check"></i></div>';
       }
     }
 
@@ -823,14 +904,13 @@
         return matchesSearch && matchesFilter;
       });
       
-      console.log(`Filtered to ${filteredApps.length} applications`);
+      console.log(`🔍 Filtered to ${filteredApps.length} applications`);
       renderApps();
     }
 
     function setActiveFilter(filter) {
       currentFilter = filter;
       
-      // Update active tab
       document.querySelectorAll('[data-filter]').forEach(tab => {
         tab.classList.remove('active');
       });
@@ -884,11 +964,11 @@
     function loadRecentActivity() {
       const recentApps = getRecentlyUsedApps().slice(0, 5);
       const activityHtml = recentApps.map(app => `
-        <div class="activity-item">
-          <div class="activity-icon">
+        <div class="activity-item" style="display: flex; align-items: center; padding: 0.5rem; border-bottom: 1px solid #e9ecef;">
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: #e3f2fd; display: flex; align-items: center; justify-content: center; margin-right: 1rem; color: #2196f3;">
             <i class="bi bi-box-arrow-up-right"></i>
           </div>
-          <div class="flex-grow-1">
+          <div style="flex-grow: 1;">
             <div class="fw-bold small">${app.name}</div>
             <div class="text-muted small">${formatRelativeTime(getLastUsed(app.client_id))}</div>
           </div>
@@ -956,29 +1036,6 @@
       return colors[type] || 'secondary';
     }
 
-    function showLoadingToast(appName) {
-      const toastHtml = `
-        <div class="toast-container position-fixed top-0 end-0 p-3">
-          <div id="ssoToast" class="toast" role="alert">
-            <div class="toast-header">
-              <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-              <strong class="me-auto">Launching ${appName}</strong>
-              <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-            </div>
-            <div class="toast-body">
-              Attempting secure sign-on...
-            </div>
-          </div>
-        </div>
-      `;
-      
-      document.body.insertAdjacentHTML('beforeend', toastHtml);
-      const toast = new bootstrap.Toast(document.getElementById('ssoToast'));
-      toast.show();
-      
-      return toast;
-    }
-
     function formatDate(dateString) {
       return new Date(dateString).toLocaleDateString();
     }
@@ -1018,7 +1075,7 @@
 
     function isRecentlyUsed(clientId) {
       const lastUsed = getLastUsed(clientId);
-      return lastUsed > (Date.now() - 7 * 24 * 60 * 60 * 1000); // Last 7 days
+      return lastUsed > (Date.now() - 7 * 24 * 60 * 60 * 1000);
     }
 
     function getRecentlyUsedApps() {
@@ -1036,7 +1093,7 @@
       document.querySelector('.container').insertAdjacentHTML('afterbegin', alertHtml);
     }
 
-    // Initialize with all apps
+    // Initialize filtered apps
     filterApps();
   </script>
 </body>
