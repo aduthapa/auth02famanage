@@ -1,6 +1,6 @@
 FROM node:20.18.0-slim
 
-# Set the NODE_OPTIONS environment variable globally in the container
+# Set the NODE_OPTIONS environment variable globally
 ENV NODE_OPTIONS="--openssl-legacy-provider"
 
 WORKDIR /app
@@ -15,19 +15,19 @@ RUN apt-get update -qq && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy package files first for better Docker layer caching
+# Copy package files
 COPY package-lock.json package.json ./
 
 # Install npm dependencies
 RUN npm ci --include=dev
 
-# Copy all source code
+# Copy source code
 COPY . .
 
-# Build the application with the NODE_OPTIONS environment variable set
-RUN npm run build
+# CRITICAL FIX: Explicitly set NODE_OPTIONS in the RUN command
+RUN NODE_OPTIONS="--openssl-legacy-provider" npm run build
 
-# Expose the port the app runs on
+# Expose port
 EXPOSE 3000
 
 # Start the application
