@@ -1,7 +1,4 @@
-FROM node:20.18.0-slim
-
-# Set the NODE_OPTIONS environment variable globally
-ENV NODE_OPTIONS="--openssl-legacy-provider"
+FROM node:16.20.2-slim
 
 WORKDIR /app
 
@@ -24,8 +21,8 @@ RUN npm ci --include=dev
 # Copy source code
 COPY . .
 
-# CRITICAL FIX: Explicitly set NODE_OPTIONS in the RUN command
-RUN NODE_OPTIONS="--openssl-legacy-provider" npm run build
+# Build the application (no OpenSSL issues with Node 16)
+RUN npm run build
 
 # Expose port
 EXPOSE 3000
