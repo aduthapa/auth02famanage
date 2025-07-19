@@ -546,10 +546,26 @@
           
           <div class="app-stats">
             <small><i class="bi bi-calendar me-1"></i>Added ${formatDate(app.created_at)}</small>
-            ${app.sso_disabled ? '' : '<div class="sso-indicator" title="SSO Enabled"><i class="bi bi-check"></i></div>'}
+            ${app.sso_disabled ? '' : getSSOModeIcon(app.app_type)}
           </div>
         </div>
       `).join('');
+    }
+
+    function getSSOModeIcon(appType) {
+      switch(appType) {
+        case 'sso_integration':
+          return '<div class="sso-indicator" title="SSO Integration" style="background: #ff9800;"><i class="bi bi-link-45deg"></i></div>';
+        case 'samlp':
+          return '<div class="sso-indicator" title="SAML SSO" style="background: #2196f3;"><i class="bi bi-shield-check"></i></div>';
+        case 'regular_web':
+        case 'spa':
+          return '<div class="sso-indicator" title="OAuth SSO"><i class="bi bi-check"></i></div>';
+        case 'non_interactive':
+          return '<div class="sso-indicator" title="API Access" style="background: #9c27b0;"><i class="bi bi-gear"></i></div>';
+        default:
+          return '<div class="sso-indicator" title="SSO Enabled"><i class="bi bi-check"></i></div>';
+      }
     }
 
     function launchApp(clientId, loginUrl) {
@@ -558,15 +574,220 @@
       // Record app launch
       recordAppLaunch(clientId);
       
-      // Launch the application
-      if (loginUrl) {
+      // Show loading indicator
+      const appCard = document.querySelector(`[data-app-id="${clientId}"]`);
+      if (appCard) {
+        appCard.style.opacity = '0.7';
+        appCard.style.pointerEvents = 'none';
+      }
+      
+      // Create a hidden iframe for silent authentication first
+      if (loginUrl && loginUrl.includes('prompt=none')) {
+        attemptSilentSSO(clientId, loginUrl, appCard);
+      } else if (loginUrl) {
+        // Direct launch for SAML or other types
         window.open(loginUrl, '_blank');
+        resetAppCard(appCard);
       } else {
         // Construct SSO URL using the config passed from server
         const baseUrl = `https://${window.AUTH0_CONFIG.customDomain || window.AUTH0_CONFIG.tenantDomain}`;
-        const ssoUrl = `${baseUrl}/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(window.AUTH0_CONFIG.baseUrl + '/apps')}&scope=openid profile email`;
+        const ssoUrl = `${baseUrl}/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(window.AUTH0_CONFIG.baseUrl + '/apps')}&scope=openid profile email&prompt=none`;
         console.log('Opening SSO URL:', ssoUrl);
-        window.open(ssoUrl, '_blank');
+        attemptSilentSSO(clientId, ssoUrl, appCard);
+      }
+    }
+
+    function launchApp(clientId, loginUrl) {
+      console.log('Launching app:', clientId);
+      
+      const app = allApps.find(a => a.client_id === clientId);
+      const appName = app ? app.name : 'Application';
+      
+      // Record app launch
+      recordAppLaunch(clientId);
+      
+      // Show loading indicator
+      const appCard = document.querySelector(`[data-app-id="${clientId}"]`);
+      if (appCard) {
+        appCard.style.opacity = '0.7';
+        appCard.style.pointerEvents = 'none';
+      }
+      
+      // Show loading toast
+      const toast = showLoadingToast(appName);
+      
+      // Handle different app types
+      if (app && app.app_type === 'samlp') {
+        // SAML apps typically work with direct SSO
+        if (loginUrl) {
+          window.open(loginUrl, '_blank');
+          resetAppCard(appCard);
+          toast.hide();
+        }
+      } else if (app && app.app_type === 'non_interactive') {
+        // API-only applications
+        showApiAppModal(app, appCard);
+        toast.hide();
+      } else if (loginUrl && loginUrl.includes('prompt=none')) {
+        // OAuth apps with silent auth
+        attemptSilentSSO(clientId, loginUrl, appCard, toast);
+      } else if (loginUrl) {
+        // Direct launch for other types
+        window.open(loginUrl, '_blank');
+        resetAppCard(appCard);
+        toast.hide();
+      } else {
+        // Construct SSO URL using the config passed from server
+        const baseUrl = `https://${window.AUTH0_CONFIG.customDomain || window.AUTH0_CONFIG.tenantDomain}`;
+        const ssoUrl = `${baseUrl}/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(window.AUTH0_CONFIG.baseUrl + '/apps')}&scope=openid profile email&prompt=none`;
+        console.log('Opening SSO URL:', ssoUrl);
+        attemptSilentSSO(clientId, ssoUrl, appCard, toast);
+      }
+    }
+
+    function showApiAppModal(app, appCard) {
+      const modalHtml = `
+        <div class="modal fade" id="apiAppModal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">
+                  <i class="bi bi-gear me-2"></i>${app.name}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body text-center">
+                <div class="mb-3">
+                  <i class="bi bi-code-slash" style="font-size: 3rem; color: #6f42c1;"></i>
+                </div>
+                <h6>API Application</h6>
+                <p class="text-muted">This is an API-only application that doesn't have a web interface to launch.</p>
+                <div class="mt-3">
+                  <small class="text-muted">Client ID: <code>${app.client_id}</code></small>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      const modal = new bootstrap.Modal(document.getElementById('apiAppModal'));
+      modal.show();
+      
+      resetAppCard(appCard);
+      
+      document.getElementById('apiAppModal').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+      });
+    }
+
+    function attemptSilentSSO(clientId, ssoUrl, appCard, toast) {
+      // Try silent authentication first
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = ssoUrl;
+      
+      let timeout = setTimeout(() => {
+        console.log('Silent SSO timeout, falling back to interactive login');
+        document.body.removeChild(iframe);
+        toast.hide();
+        fallbackToInteractiveLogin(clientId, ssoUrl.replace('prompt=none', 'prompt=login'), appCard);
+      }, 5000); // 5 second timeout
+      
+      iframe.onload = function() {
+        try {
+          // Check if we got redirected to the callback (successful auth)
+          const iframeUrl = iframe.contentWindow.location.href;
+          if (iframeUrl.includes('code=') || iframeUrl.includes('/apps')) {
+            console.log('Silent SSO successful');
+            clearTimeout(timeout);
+            document.body.removeChild(iframe);
+            toast.hide();
+            
+            // Open the app in a new window with the authenticated session
+            const appUrl = ssoUrl.replace('prompt=none', '');
+            window.open(appUrl, '_blank');
+            resetAppCard(appCard);
+          }
+        } catch (e) {
+          // Cross-origin error means we're on the login page (auth required)
+          console.log('Silent SSO failed, user needs to authenticate');
+          clearTimeout(timeout);
+          document.body.removeChild(iframe);
+          toast.hide();
+          fallbackToInteractiveLogin(clientId, ssoUrl.replace('prompt=none', 'prompt=login'), appCard);
+        }
+      };
+      
+      document.body.appendChild(iframe);
+    }
+
+    function fallbackToInteractiveLogin(clientId, ssoUrl, appCard) {
+      // Show user-friendly message
+      showSSOMModal(clientId, ssoUrl, appCard);
+    }
+
+    function showSSOMModal(clientId, ssoUrl, appCard) {
+      const app = allApps.find(a => a.client_id === clientId);
+      const modalHtml = `
+        <div class="modal fade" id="ssoModal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">
+                  <i class="bi bi-box-arrow-up-right me-2"></i>Launch ${app ? app.name : 'Application'}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body text-center">
+                <div class="mb-3">
+                  <i class="bi bi-shield-lock" style="font-size: 3rem; color: #0d6efd;"></i>
+                </div>
+                <h6>Authentication Required</h6>
+                <p class="text-muted">You'll be redirected to sign in to access this application.</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="proceedToApp('${ssoUrl}')">
+                  <i class="bi bi-box-arrow-up-right me-2"></i>Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Remove existing modal if any
+      const existingModal = document.getElementById('ssoModal');
+      if (existingModal) {
+        existingModal.remove();
+      }
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      const modal = new bootstrap.Modal(document.getElementById('ssoModal'));
+      modal.show();
+      
+      // Reset app card when modal is closed
+      document.getElementById('ssoModal').addEventListener('hidden.bs.modal', function() {
+        resetAppCard(appCard);
+        this.remove();
+      });
+    }
+
+    function proceedToApp(ssoUrl) {
+      window.open(ssoUrl, '_blank');
+      const modal = bootstrap.Modal.getInstance(document.getElementById('ssoModal'));
+      modal.hide();
+    }
+
+    function resetAppCard(appCard) {
+      if (appCard) {
+        appCard.style.opacity = '1';
+        appCard.style.pointerEvents = 'auto';
       }
     }
 
@@ -709,7 +930,13 @@
         'storage': 'bi-cloud-arrow-up',
         'drive': 'bi-folder',
         'mail': 'bi-envelope',
-        'calendar': 'bi-calendar'
+        'calendar': 'bi-calendar',
+        'wordpress': 'bi-wordpress',
+        'wp': 'bi-wordpress',
+        'admin': 'bi-gear-fill',
+        'workspace': 'bi-briefcase',
+        'office': 'bi-file-earmark-text',
+        'dashboard': 'bi-speedometer2'
       };
       
       const iconClass = Object.keys(icons).find(key => name.toLowerCase().includes(key));
@@ -722,9 +949,34 @@
         'spa': 'success', 
         'regular_web': 'info',
         'native': 'warning',
-        'm2m': 'secondary'
+        'm2m': 'secondary',
+        'sso_integration': 'warning',
+        'non_interactive': 'dark'
       };
-      return colors[type] || 'dark';
+      return colors[type] || 'secondary';
+    }
+
+    function showLoadingToast(appName) {
+      const toastHtml = `
+        <div class="toast-container position-fixed top-0 end-0 p-3">
+          <div id="ssoToast" class="toast" role="alert">
+            <div class="toast-header">
+              <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+              <strong class="me-auto">Launching ${appName}</strong>
+              <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+              Attempting secure sign-on...
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', toastHtml);
+      const toast = new bootstrap.Toast(document.getElementById('ssoToast'));
+      toast.show();
+      
+      return toast;
     }
 
     function formatDate(dateString) {
