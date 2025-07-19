@@ -73,7 +73,7 @@
             Account Management Portal
           </h1>
           <p class="lead mb-4">
-            Securely manage your profile, enhance your security with two-factor authentication, and keep your account information up to date.
+            Securely manage your profile, enhance your security with two-factor authentication, and access all your applications with single sign-on.
           </p>
           
           <% if (isAuthenticated) { %>
@@ -85,8 +85,8 @@
               <a href="/account" class="btn btn-light btn-hero">
                 <i class="bi bi-speedometer2 me-2"></i>Account Dashboard
               </a>
-              <a href="/profile" class="btn btn-outline-light btn-hero">
-                <i class="bi bi-person-gear me-2"></i>Manage Profile
+              <a href="/apps" class="btn btn-outline-light btn-hero">
+                <i class="bi bi-grid-3x3-gap me-2"></i>My Apps
               </a>
             </div>
           <% } else { %>
@@ -167,12 +167,12 @@
         <div class="card feature-card">
           <div class="card-body text-center p-4">
             <div class="feature-icon text-info">
-              <i class="bi bi-speedometer2"></i>
+              <i class="bi bi-grid-3x3-gap"></i>
             </div>
-            <h5 class="card-title">Overview</h5>
-            <p class="card-text text-muted">View your account summary and activity statistics</p>
-            <a href="/account" class="btn btn-info">
-              <i class="bi bi-eye me-1"></i>View Dashboard
+            <h5 class="card-title">My Apps</h5>
+            <p class="card-text text-muted">Single sign-on to all your applications with one click</p>
+            <a href="/apps" class="btn btn-info">
+              <i class="bi bi-box-arrow-up-right me-1"></i>Launch Apps
             </a>
           </div>
         </div>
@@ -188,7 +188,7 @@
     </div>
     
     <div class="row g-4">
-      <div class="col-md-6 col-lg-4">
+      <div class="col-md-6 col-lg-3">
         <div class="card feature-card">
           <div class="card-body text-center p-4">
             <div class="feature-icon text-primary">
@@ -200,7 +200,7 @@
         </div>
       </div>
       
-      <div class="col-md-6 col-lg-4">
+      <div class="col-md-6 col-lg-3">
         <div class="card feature-card">
           <div class="card-body text-center p-4">
             <div class="feature-icon text-success">
@@ -212,7 +212,7 @@
         </div>
       </div>
       
-      <div class="col-md-6 col-lg-4">
+      <div class="col-md-6 col-lg-3">
         <div class="card feature-card">
           <div class="card-body text-center p-4">
             <div class="feature-icon text-warning">
@@ -220,6 +220,18 @@
             </div>
             <h5 class="card-title">Real-time Monitoring</h5>
             <p class="card-text">Monitor your account activity, login history, and security status with comprehensive dashboard insights.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-6 col-lg-3">
+        <div class="card feature-card">
+          <div class="card-body text-center p-4">
+            <div class="feature-icon text-info">
+              <i class="bi bi-grid-3x3-gap"></i>
+            </div>
+            <h5 class="card-title">Application Access</h5>
+            <p class="card-text">Single sign-on to all your applications with one click. Secure, fast, and convenient access to your tools.</p>
           </div>
         </div>
       </div>
@@ -231,21 +243,28 @@
   <div class="stats-section">
     <div class="container">
       <div class="row">
-        <div class="col-md-4">
+        <div class="col-md-3">
           <div class="stat-item">
             <div class="stat-number">5+</div>
             <h5>Security Methods</h5>
             <p class="text-muted mb-0">Multiple 2FA options available</p>
           </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
+          <div class="stat-item">
+            <div class="stat-number">SSO</div>
+            <h5>App Access</h5>
+            <p class="text-muted mb-0">One-click application login</p>
+          </div>
+        </div>
+        <div class="col-md-3">
           <div class="stat-item">
             <div class="stat-number">24/7</div>
             <h5>Account Access</h5>
             <p class="text-muted mb-0">Manage your settings anytime</p>
           </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <div class="stat-item">
             <div class="stat-number">100%</div>
             <h5>Secure</h5>
@@ -262,7 +281,7 @@
       <div class="row align-items-center">
         <div class="col-md-6">
           <h5 class="text-white">Account Management Portal</h5>
-          <p class="mb-0">Secure, reliable, and user-friendly account management.</p>
+          <p class="mb-0">Secure, reliable, and user-friendly account management with single sign-on capabilities.</p>
         </div>
         <div class="col-md-6 text-end">
           <% if (isAuthenticated) { %>
@@ -309,11 +328,11 @@
               </ul>
             </div>
             <div class="col-md-6">
-              <h6><i class="bi bi-check-circle text-success me-2"></i>Account Insights</h6>
+              <h6><i class="bi bi-check-circle text-success me-2"></i>Application Access</h6>
               <ul class="list-unstyled ms-4">
-                <li>• Login history tracking</li>
-                <li>• Security level assessment</li>
-                <li>• Activity dashboard</li>
+                <li>• Single sign-on to all apps</li>
+                <li>• One-click application launch</li>
+                <li>• Secure access management</li>
               </ul>
             </div>
             <div class="col-md-6">
@@ -362,21 +381,23 @@
           entries.forEach(entry => {
             if (entry.isIntersecting) {
               const finalValue = entry.target.textContent;
-              entry.target.textContent = '0';
-              
-              const duration = 2000;
-              const increment = finalValue.replace(/\D/g, '') / (duration / 16);
-              let current = 0;
-              
-              const timer = setInterval(() => {
-                current += increment;
-                if (current >= parseInt(finalValue.replace(/\D/g, ''))) {
-                  entry.target.textContent = finalValue;
-                  clearInterval(timer);
-                } else {
-                  entry.target.textContent = Math.floor(current) + finalValue.replace(/\d/g, '');
-                }
-              }, 16);
+              if (finalValue.match(/\d+/)) {
+                entry.target.textContent = '0';
+                
+                const duration = 2000;
+                const increment = finalValue.replace(/\D/g, '') / (duration / 16);
+                let current = 0;
+                
+                const timer = setInterval(() => {
+                  current += increment;
+                  if (current >= parseInt(finalValue.replace(/\D/g, ''))) {
+                    entry.target.textContent = finalValue;
+                    clearInterval(timer);
+                  } else {
+                    entry.target.textContent = Math.floor(current) + finalValue.replace(/\d/g, '');
+                  }
+                }, 16);
+              }
             }
           });
         }, { threshold: 0.8 });
